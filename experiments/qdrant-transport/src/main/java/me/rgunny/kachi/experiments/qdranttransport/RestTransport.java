@@ -127,7 +127,7 @@ public final class RestTransport implements Transport {
     private void deleteCollection() {
         HttpResponse<byte[]> deleted = send(HttpRequest.newBuilder(collectionUri("")).DELETE(), false);
         if (deleted.statusCode() >= 300 && deleted.statusCode() != 404) {
-            throw new IllegalStateException("DELETE " + collectionUri("") + " → " + deleted.statusCode()
+            throw new IllegalStateException("DELETE " + collectionUri("") + " -> " + deleted.statusCode()
                     + " " + new String(deleted.body(), StandardCharsets.UTF_8));
         }
         for (int attempt = 0; attempt < 50; attempt++) {
@@ -166,7 +166,7 @@ public final class RestTransport implements Transport {
         try {
             HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (failOnError && response.statusCode() >= 300) {
-                throw new IllegalStateException(request.method() + " " + request.uri() + " → " + response.statusCode()
+                throw new IllegalStateException(request.method() + " " + request.uri() + " -> " + response.statusCode()
                         + " " + new String(response.body(), StandardCharsets.UTF_8));
             }
             return response;

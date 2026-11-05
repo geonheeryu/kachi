@@ -51,7 +51,7 @@ import org.springframework.context.annotation.Profile
 @EnableConfigurationProperties(UserSeedProperties::class)
 class LocalSeedDataConfig {
 
-    /** 시드 사용자 → SLACK 바인딩 → canonical 키워드 → 구독 → 관리자 사용자 → 관리자 바인딩 → 관리자 구독 순으로 심고 결과를 한 줄 남긴다. */
+    /** 시드 사용자 -> SLACK 바인딩 -> canonical 키워드 -> 구독 -> 관리자 사용자 -> 관리자 바인딩 -> 관리자 구독 순으로 심고 결과를 한 줄 남긴다. */
     @Bean
     fun localSeedDataInitializer(
         userJpaRepository: UserJpaRepository,

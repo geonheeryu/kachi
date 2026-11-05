@@ -109,7 +109,7 @@ yaml은 `kachi.ai.llm` 아래에 있다.
 
 | 프로파일 | 후보 | 비고 |
 | --- | --- | --- |
-| 기본(`application.yaml`) | `GROQ_QWEN3_27B` → `MISTRAL_SMALL_2603` | `GROQ_API_KEY`·`MISTRAL_API_KEY`가 있어야 뜬다 |
+| 기본(`application.yaml`) | `GROQ_QWEN3_27B` -> `MISTRAL_SMALL_2603` | `GROQ_API_KEY`·`MISTRAL_API_KEY`가 있어야 뜬다 |
 | `local` | `OLLAMA_QWEN3_27B` | 같은 머신의 Ollama. 키가 없고 `ollama pull qwen3.8:27b`가 먼저다 |
 | `test` | `OLLAMA_QWEN3_27B` | 주소가 테스트 stub이다 |
 
@@ -373,7 +373,7 @@ DOCKER_HOST=unix://$HOME/.docker/run/docker.sock ./gradlew :ai-service:test
 
 프로파일의 설정을 Spring 컨텍스트 없이 바인딩해 운영과 같은 조립(adapter·가드·WebClient)으로 후보를 만든다.
 `default`는 기본 yaml만 쓰고, 그 밖의 이름은 `application-<profile>.yaml`이 있어야 한다.
-secret은 기동 스크립트와 같은 순서로 찾는다. 환경변수 → `.env.<profile>` → `.env`이며 없으면 skip이 아니라 실패다.
+secret은 기동 스크립트와 같은 순서로 찾는다. 환경변수 -> `.env.<profile>` -> `.env`이며 없으면 skip이 아니라 실패다.
 
 검사하는 것은 둘이다.
 

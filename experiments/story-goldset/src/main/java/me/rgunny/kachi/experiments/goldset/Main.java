@@ -8,12 +8,12 @@ import java.util.List;
  * 골드셋 실험의 진입점. 네 단계를 순서대로 따로 돌린다.
  *
  * <pre>
- * extract   generated/*.jsonl → goldset/pairs.jsonl (쌍 250개)
- * draft     Ollama로 초안 → pairs.jsonl 갱신, results/review.md
+ * extract   generated/*.jsonl -> goldset/pairs.jsonl (쌍 250개)
+ * draft     Ollama로 초안 -> pairs.jsonl 갱신, results/review.md
  * review    검토표만 다시 만든다 (점수가 있으면 코사인 순)
- * apply     검토표의 확정 칸 → pairs.jsonl의 label
- * score     DJL로 코사인·판정 점수 → results/scores.jsonl
- * evaluate  θ 조합 평가 → results/thresholds.md
+ * apply     검토표의 확정 칸 -> pairs.jsonl의 label
+ * score     DJL로 코사인·판정 점수 -> results/scores.jsonl
+ * evaluate  θ 조합 평가 -> results/thresholds.md
  * </pre>
  * 작업 디렉터리는 실험 루트(experiments/story-goldset)여야 한다. Gradle run이 그렇게 맞춘다.
  */

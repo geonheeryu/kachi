@@ -44,7 +44,7 @@ import org.testcontainers.kafka.KafkaContainer
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * story 이벤트 한 건이 소비 → 사본 기록 → 즉시 트리거 → LLM 호출 → 버전 저장 → outbox → relay → broker까지 완주하는지 보는 통합 테스트.
+ * story 이벤트 한 건이 소비 -> 사본 기록 -> 즉시 트리거 -> LLM 호출 -> 버전 저장 -> outbox -> relay -> broker까지 완주하는지 보는 통합 테스트.
  *
  * LLM은 테스트 JVM 안의 stub이 받고, Mongo replica set과 Kafka는 컨테이너다.
  * broker에서 읽은 레코드는 소비자가 쓰는 계약 타입(`ai-contract`)으로 역직렬화한다.

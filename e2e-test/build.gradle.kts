@@ -6,7 +6,7 @@ plugins {
     id("io.spring.dependency-management")
 }
 
-description = "서비스 다섯 개를 컨테이너로 띄워 구독 → 요약 → 라우팅 → 발송 사이클을 끝까지 확인하는 e2e 테스트 (ADR 029)"
+description = "서비스 다섯 개를 컨테이너로 띄워 구독 -> 요약 -> 라우팅 -> 발송 사이클을 끝까지 확인하는 e2e 테스트 (ADR 029)"
 
 java {
     toolchain {

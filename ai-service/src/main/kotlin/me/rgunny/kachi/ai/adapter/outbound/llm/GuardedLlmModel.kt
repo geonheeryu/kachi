@@ -132,7 +132,7 @@ class GuardedLlmModel(
     /**
      * 서킷·cooldown·모델 hold·제공자 hold를 전부 푼다.
      *
-     * 이미 닫힌 회로는 전이하지 않는다(Resilience4j는 CLOSED → CLOSED 전이 요청을 거부함).
+     * 이미 닫힌 회로는 전이하지 않는다(Resilience4j는 CLOSED -> CLOSED 전이 요청을 거부함).
      */
     fun reset() {
         if (circuitBreaker.state != CircuitBreaker.State.CLOSED) {
@@ -180,7 +180,7 @@ class GuardedLlmModel(
         activeModelHold(now)?.let { throw notPermitted(modelHoldReason(it)) }
         coolingDownUntil(now)?.let { throw notPermitted(cooldownReason(it)) }
 
-        // 2. permission을 얻는다(OPEN → HALF_OPEN 전이 계기).
+        // 2. permission을 얻는다(OPEN -> HALF_OPEN 전이 계기).
         if (!circuitBreaker.tryAcquirePermission()) {
             throw notPermitted(blockedReason(Instant.now(clock)))
         }

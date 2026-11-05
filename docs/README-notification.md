@@ -55,7 +55,7 @@ kachi의 notification 컨텍스트를 한곳에서 읽는 문서다. 핵심만 �
 
 ![notification 모듈 의존](images/notification-modules.svg)
 
-의존 방향은 `service → core → contract`, `worker → core → contract`, `routing → contract`다. service와 worker는 adapter와 조립만 갖고, 유스케이스는 저장·발행·선점·발송을 포트로만 본다. 의존 방향과 배치 규칙은 모듈별 ArchUnit 테스트가 검사한다.
+의존 방향은 `service -> core -> contract`, `worker -> core -> contract`, `routing -> contract`다. service와 worker는 adapter와 조립만 갖고, 유스케이스는 저장·발행·선점·발송을 포트로만 본다. 의존 방향과 배치 규칙은 모듈별 ArchUnit 테스트가 검사한다.
 
 상세문서: [ADR 012](decisions/012-notification-service-초기-모듈-설계.md) · [아키텍처](아키텍처.md)
 

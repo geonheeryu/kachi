@@ -56,13 +56,13 @@ Kachi는 사용자가 등록한 관심 키워드를 기준으로 뉴스와 시�
 ```text
 user-service
   └─ 키워드 구독·채널 바인딩 등록/관리
-      -> collector-service ── 활성 키워드 조회(HTTP internal) 후 뉴스 수집, `collector.news.collected` 발행
-          -> story-service ── 기사를 같은 사건 단위 story로 조립, `story.article.attached`·`story.merged` 발행 (소비자는 ADR 034 예정)
-          -> ai-service ── 수집 뉴스를 키워드별로 LLM 요약 (newsHash 중복 방지), `ai.summary.created`·`ai.keyword.quarantined` 발행
-              -> notification-routing ── ai 이벤트를 구독자·관리자 x 채널로 fan-out해 `notification.requested` 발행
-              -> notification-service ── 알림 접수, outbox 발행
-                  -> notification-worker ── Slack/Discord/Telegram 발송
-                      -> history-service ── 이력 적재 / 통계 집계 (미구현)
+      -> collector-service: 활성 키워드 조회(HTTP internal) 후 뉴스 수집, `collector.news.collected` 발행
+          -> story-service: 기사를 같은 사건 단위 story로 조립, `story.article.attached`·`story.merged` 발행 (소비자는 ADR 034 예정)
+          -> ai-service: 수집 뉴스를 키워드별로 LLM 요약 (newsHash 중복 방지), `ai.summary.created`·`ai.keyword.quarantined` 발행
+              -> notification-routing: ai 이벤트를 구독자·관리자 x 채널로 fan-out해 `notification.requested` 발행
+              -> notification-service: 알림 접수, outbox 발행
+                  -> notification-worker: Slack/Discord/Telegram 발송
+                      -> history-service: 이력 적재 / 통계 집계 (미구현)
 ```
 
 서비스 간 경계와 전체 데이터 흐름은 [도메인모델.md의 컨텍스트 맵](./docs/도메인모델.md)을
@@ -153,7 +153,7 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 
 전체 사이클을 한 번에 띄워 실제 LLM·채널로 확인할 때는 `cycle.sh`를 쓴다.
 
-- 인프라 → Mongo index → user-service → 나머지 순으로 기동한다. ai-service의 LLM 후보는 local 프로파일의 Ollama 하나라 먼저 준비됐는지 본다.
+- 인프라 -> Mongo index -> user-service -> 나머지 순으로 기동한다. ai-service의 LLM 후보는 local 프로파일의 Ollama 하나라 먼저 준비됐는지 본다.
 - 확인 절차는 [docs/전체-사이클-스모크.md](./docs/전체-사이클-스모크.md)에 있다.
 
 ```sh

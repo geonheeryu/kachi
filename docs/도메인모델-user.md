@@ -119,7 +119,7 @@ _Aggregate Root_
 _Value Object_
 
 - `value`: 정규화된 키워드 문자열
-- `of(raw)`: `KeywordNormalizer`로 정규화한다. NFKC → trim → 연속 공백 1개 → `lowercase(Locale.ROOT)` → 양끝 구두점(Unicode P* 카테고리) 제거.
+- `of(raw)`: `KeywordNormalizer`로 정규화한다. NFKC -> trim -> 연속 공백 1개 -> `lowercase(Locale.ROOT)` -> 양끝 구두점(Unicode P* 카테고리) 제거.
   기호(`$tsla`의 `$`)와 문자열 중간의 구두점(`space-x`의 하이픈)은 남긴다. 결과가 비거나 100자를 넘으면 거부한다.
 - `Tesla`, ` TESLA `, `Ｔｅｓｌａ`, `테슬라.`는 각각 `tesla`, `tesla`, `tesla`, `테슬라`가 된다.
 

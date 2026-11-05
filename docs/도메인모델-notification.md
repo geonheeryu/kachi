@@ -41,15 +41,15 @@ _Aggregate Root_
 
 - `static request(...)`: 알림을 `REQUESTED` 상태로 접수한다
 - `static restore(...)`: 저장소 snapshot을 복원한다. claim 정보와 상태의 정합을 검증한다
-- `markPublished(now)`: dispatch message 발행 성공. `REQUESTED | PUBLISH_FAILED → PUBLISHED` (멱등)
-- `markPublishFailed(now, reason)`: 발행 실패. `REQUESTED → PUBLISH_FAILED` (이미 발행됐으면 무시)
-- `markProcessing(now, claimedBy)`: worker claim. `PUBLISHED | RETRY_WAIT → PROCESSING` (멱등)
-- `markSent(now)`: 발송 성공. `PROCESSING → SENT`, 시도 횟수 증가, claim 해제
-- `markFailed(now, reason)`: 발송 실패. `PROCESSING → FAILED`, 시도 횟수 증가, claim 해제
-- `markRetryWait(now, reason)`: 자동 재시도 대기. `FAILED → RETRY_WAIT`
-- `markDead(now, reason)`: 자동 재시도 종료. `FAILED → DEAD` (멱등)
-- `markSuppressed(now, reason)`: 발송하지 않고 종료(스킵). `PROCESSING → SUPPRESSED`, 시도 횟수는 그대로, claim 해제. 사유는 `recipient unavailable: {reason}`(바인딩 없음·PENDING·REVOKED·주소 없음·채널 불일치)과 `already sent`(발송 직전 중복 가드) 두 종류
-- `recoverDeadToRequested(now, reason)`: 운영자 수동 복구. `DEAD → REQUESTED`
+- `markPublished(now)`: dispatch message 발행 성공. `REQUESTED | PUBLISH_FAILED -> PUBLISHED` (멱등)
+- `markPublishFailed(now, reason)`: 발행 실패. `REQUESTED -> PUBLISH_FAILED` (이미 발행됐으면 무시)
+- `markProcessing(now, claimedBy)`: worker claim. `PUBLISHED | RETRY_WAIT -> PROCESSING` (멱등)
+- `markSent(now)`: 발송 성공. `PROCESSING -> SENT`, 시도 횟수 증가, claim 해제
+- `markFailed(now, reason)`: 발송 실패. `PROCESSING -> FAILED`, 시도 횟수 증가, claim 해제
+- `markRetryWait(now, reason)`: 자동 재시도 대기. `FAILED -> RETRY_WAIT`
+- `markDead(now, reason)`: 자동 재시도 종료. `FAILED -> DEAD` (멱등)
+- `markSuppressed(now, reason)`: 발송하지 않고 종료(스킵). `PROCESSING -> SUPPRESSED`, 시도 횟수는 그대로, claim 해제. 사유는 `recipient unavailable: {reason}`(바인딩 없음·PENDING·REVOKED·주소 없음·채널 불일치)과 `already sent`(발송 직전 중복 가드) 두 종류
+- `recoverDeadToRequested(now, reason)`: 운영자 수동 복구. `DEAD -> REQUESTED`
 - `canRetry(maxAttempts)`: 시도 횟수가 한도 미만인지 판단한다
 
 #### 규칙(Rules)
@@ -131,12 +131,12 @@ _Aggregate Root_
 
 - `static create(...)`: `PENDING` outbox를 생성한다
 - `static restore(...)`: 저장소 snapshot을 복원한다. claim 정보와 상태의 정합을 검증한다
-- `markPublishing(now, claimedBy)`: 발행 처리 권한 획득. `PENDING → PUBLISHING` (CAS claim)
-- `markPublished(now)`: Kafka 발행 성공. `PUBLISHING → PUBLISHED` (멱등), lastError 해제
+- `markPublishing(now, claimedBy)`: 발행 처리 권한 획득. `PENDING -> PUBLISHING` (CAS claim)
+- `markPublished(now)`: Kafka 발행 성공. `PUBLISHING -> PUBLISHED` (멱등), lastError 해제
 - `recordFailure(reason, retryPolicy, now)`: 발행 실패 기록. retry 한도 안이면
-  `PUBLISHING → PENDING` + `nextRetryAt` 계산, 한도 도달이면 `PUBLISHING → DEAD`
-- `markDead(reason)`: 즉시 자동 재시도 종료. `PUBLISHING → DEAD`
-- `recoverToPending(now)`: 운영자 복구. `DEAD → PENDING`, 카운터·실패 정보 초기화
+  `PUBLISHING -> PENDING` + `nextRetryAt` 계산, 한도 도달이면 `PUBLISHING -> DEAD`
+- `markDead(reason)`: 즉시 자동 재시도 종료. `PUBLISHING -> DEAD`
+- `recoverToPending(now)`: 운영자 복구. `DEAD -> PENDING`, 카운터·실패 정보 초기화
 
 #### 규칙(Rules)
 
@@ -230,7 +230,7 @@ Kafka retry가 끝나 DLT에 도달한 `notification.dispatch` record의 운영�
 
 - `static record(...)`: DLT record를 `PENDING` 메시지로 기록한다
 - `static restore(...)`: 저장소 snapshot을 복원한다. 상태와 종료 필드의 정합을 검증한다
-- `discard(now, reason)`: 운영자가 재처리하지 않기로 판단해 `PENDING → DISCARDED`로 종료한다
+- `discard(now, reason)`: 운영자가 재처리하지 않기로 판단해 `PENDING -> DISCARDED`로 종료한다
 - `canDiscard()`: 폐기 가능 여부 (`PENDING`인가)
 
 #### 규칙(Rules)

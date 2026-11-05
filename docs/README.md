@@ -18,7 +18,7 @@ docs/의 각 문서는 축이 하나다. 같은 내용을 두 문서에 적지 �
 | [collector-webclient-설정.md](collector-webclient-설정.md) | 운영 | collector WebClient 설정 상세 | 해당 설정 변경 |
 | [README-notification.md](README-notification.md) | 지도 | notification 컨텍스트 종합: 파이프라인 구간, 모듈, 핵심 설계 요약, API, 운영 확장 설계. 상세는 각 문서로 링크한다 | notification 모듈·흐름·운영 계획 변경 |
 | [알림-멱등-가드.md](알림-멱등-가드.md) | 운영 | 알림이 한 번만 가게 하는 네 층의 가드와 각 층이 막는 상황 | 가드 추가·변경 |
-| [전체-사이클-스모크.md](전체-사이클-스모크.md) | 운영 | 실제 LLM·채널로 수집 → 요약 → 알림 수신을 사람이 확인하는 절차와 재실행 방법 | 사이클 구성·기동 절차 변경 |
+| [전체-사이클-스모크.md](전체-사이클-스모크.md) | 운영 | 실제 LLM·채널로 수집 -> 요약 -> 알림 수신을 사람이 확인하는 절차와 재실행 방법 | 사이클 구성·기동 절차 변경 |
 | [user-intervention.md](user-intervention.md) | 사람 | CLI로 끝나지 않는 일의 목록. 절차는 원본 문서를 가리킨다 | 사람 몫이 새로 드러날 때 |
 | [decisions/](decisions/) | 왜(Why) | ADR — 설계 결정의 배경, 대안, 반려안 | 되돌리기 어려운 결정마다 |
 

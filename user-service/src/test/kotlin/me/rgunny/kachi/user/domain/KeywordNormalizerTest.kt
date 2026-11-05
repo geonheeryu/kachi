@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 @DisplayName("KeywordNormalizer")
 class KeywordNormalizerTest {
 
-    @ParameterizedTest(name = "\"{0}\" → \"{1}\"")
+    @ParameterizedTest(name = "\"{0}\" -> \"{1}\"")
     @CsvSource(
         value = [
             "'Ｔｅｓｌａ'|'tesla'",

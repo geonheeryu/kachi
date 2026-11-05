@@ -159,5 +159,5 @@ kachi:
 
 ## 후속
 
-- Kafka Testcontainers로 relay → 발행 → 계약대로 읽히는지 검증하는 통합 테스트 (ADR 029에서 추가했다)
+- Kafka Testcontainers로 relay -> 발행 -> 계약대로 읽히는지 검증하는 통합 테스트 (ADR 029에서 추가했다)
 - 소비자: notification-service routing (ADR 025 R1)

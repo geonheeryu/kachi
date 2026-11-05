@@ -111,7 +111,7 @@ kachi:
 - 닫기: `lastArticleAt`이 `close-after` 지난 OPEN story를 닫고 색인에서 그 story의 벡터를 지운다.
 - 병합: `openedAt`이 `scan-window` 안인 OPEN story끼리 centroid 유사도 ≥ θ_high면 합친다. 생존자는 먼저 연 쪽이다.
 - 정리: 후보 창(`assembly.candidate-window`)을 지난 기사 벡터를 지운다. 보관 창 키는 조립의 것을 같이 읽는다.
-- relay: PENDING claim → 발행 → finalize CAS. visibility timeout이 지난 PUBLISHING 행을 회수한다.
+- relay: PENDING claim -> 발행 -> finalize CAS. visibility timeout이 지난 PUBLISHING 행을 회수한다.
 
 lock 범위는 주기 작업이 `CLUSTER`, relay가 `INSTANCE`다(ADR 036). 현재 구현은 in-memory라 단일 인스턴스 전제다.
 

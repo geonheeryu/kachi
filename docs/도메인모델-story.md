@@ -167,7 +167,7 @@ collector·ai의 outbox와 같은 구조다(ADR 015·022·032·033). 컨텍스�
 _Aggregate Root_
 
 - 발행해야 할 story 이벤트 1건과 그 발행 상태. `eventType`·`eventKey`·`partitionKey`·`payload`(생성 시점에 계약 JSON으로 고정)·`status`·`retryCount`·`nextRetryAt`·`claim` 등
-- 전이: PENDING → PUBLISHING(claim) → PUBLISHED | DEAD, DEAD → PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
+- 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
 
 ### 발행 소유권(StoryOutboxClaim)
 
