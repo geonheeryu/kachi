@@ -40,7 +40,7 @@ story-service의 `realTest`와 전체 사이클 스모크가 이 컨테이너를
 
 - [ ] `./gradlew :ai-service:realTest`를 과금 계정으로 실행할지 정하고, 실행한다면 해당 provider의 API 키를 `.env`에 넣는다.
 
-`realTest`는 `check`에 포함되지 않는 JVM Test Suite이고, 과금 계정은 클래스 단위로 opt-in한다(ADR 030, `docs/테스트전략.md`). 과금 여부는 사람이 결정한다.
+`realTest`는 `check`에 포함되지 않는 JVM Test Suite이고, 과금 계정은 클래스 단위로 opt-in한다(`docs/테스트전략.md`). 과금 여부는 사람이 결정한다.
 
 ## 5. 전체 사이클 스모크의 수신 확인
 

@@ -9,7 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document
 /**
  * Notification 상태 전이 이력 document.
  *
- * service adapter와 동일하게 별도 collection에 append-only로 저장한다.
+ * 별도 collection에 append-only로 저장한다.
  * 상태 변경과 history insert는 같은 MongoDB transaction 안에서 확정한다.
  */
 @Document("notification_histories")

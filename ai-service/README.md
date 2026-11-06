@@ -10,7 +10,7 @@ LLM 기반 키워드 확장과 뉴스 요약을 담당하는 서비스다.
 
 ## 설계 기준
 
-`ai-service`는 기존 서비스와 동일하게 Hexagonal Architecture를 따른다.
+`ai-service`는 Hexagonal Architecture를 따른다.
 
 ```text
 Scheduler 또는 Internal API
@@ -26,10 +26,10 @@ Scheduler 또는 Internal API
               -> MongoDB
 ```
 
-초기에는 `collector-service`와 같은 WebFlux + reactive MongoDB 구성을 사용한다.
+WebFlux와 reactive MongoDB를 쓴다.
 LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요하므로 MVC보다 WebFlux 구성이 더 적합하다.
 
-## 현재 구현 예정 범위
+## 구현 범위
 
 - `KeywordExpansion`, `NewsSummary`, `AiRun` 도메인 모델
 - 키워드 확장 internal API
@@ -40,6 +40,9 @@ LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요�
 - LLM provider adapter
 - user-service 활성 키워드 조회 client
 - collector-service 뉴스 조회 client
+- story 이벤트 소비와 story 요약, story 격리
+- 키워드 격리와 요약 watermark
+- outbox 기반 이벤트 발행
 
 ## Scheduler
 
@@ -64,7 +67,7 @@ test 프로필은 셋 다 끈다.
 
 ## story 요약
 
-story-service가 발행한 이벤트를 소비해 story와 기사의 사본을 만들고, 사본만 읽어 요약 버전을 쌓는다(ADR 034).
+story-service가 발행한 이벤트를 소비해 story와 기사의 사본을 만들고, 사본만 읽어 요약 버전을 쌓는다.
 
 ```text
 story.article.attached -> StoryArticleAttachedKafkaListener
@@ -99,7 +102,7 @@ AiStorySummaryScheduler
 
 ## 이벤트 발행
 
-요약 생성과 격리, 분리 요청은 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다(ADR 022, 023, 034).
+요약 생성과 격리, 분리 요청은 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다.
 outbox 행 하나가 레코드 하나다. topic은 행의 eventType이 고르고, value는 기록 시점의 계약 JSON이다.
 key는 키워드 경로에서 keyword, story 경로에서 storyId다.
 계약 타입은 `ai-contract` 모듈에 있다.
@@ -118,14 +121,14 @@ key는 키워드 경로에서 keyword, story 경로에서 storyId다.
 | --- | --- | --- |
 | `kachi.ai.outbox.relay.enabled` | outbox를 읽어 발행 포트로 넘기는 relay | `true` |
 | `kachi.ai.events.enabled` | Kafka 발행 어댑터 | `true` |
-| `kachi.ai.story-summary.events-enabled` | story 경로의 세 이벤트를 outbox에 남길지(ADR 034). env는 `KACHI_AI_STORY_EVENTS_ENABLED`다 | `false` |
+| `kachi.ai.story-summary.events-enabled` | story 경로의 세 이벤트를 outbox에 남길지. env는 `KACHI_AI_STORY_EVENTS_ENABLED`다. 기본값을 꺼 둔 이유는 ADR 034에 있다 | `false` |
 
 relay만 켜고 어댑터가 없으면 기동에 실패한다. local은 앞의 둘을 켜고 test 프로파일은 둘 다 `false`다.
-누가 어떤 채널로 받는지는 이 서비스가 모른다. 요약을 알림으로 fan-out하는 일은 notification-service의 routing이 한다(ADR 025).
+누가 어떤 채널로 받는지는 이 서비스가 모른다. 요약을 알림으로 fan-out하는 일은 notification-service의 routing이 한다.
 
 ## LLM
 
-LLM 호출의 단위는 모델이다. 어느 회사의 어느 모델을 어느 용도에 쓰는지는 `domain/llm`의 enum이 정하고, 주소·키·시간·후보 순서만 yaml이 정한다(ADR 030).
+LLM 호출의 단위는 모델이다. 어느 회사의 어느 모델을 어느 용도에 쓰는지는 `domain/llm`의 enum이 정하고, 주소·키·시간·후보 순서만 yaml이 정한다.
 
 | enum | 뜻 | 상수 |
 | --- | --- | --- |
@@ -172,13 +175,12 @@ api-key 검증은 후보에 오른 제공자에만 건다. 정의만 있는 클�
 - 분산 lock
 - provider별 상세 비용 최적화
 
-현재 `user-service`의 활성 키워드 internal API는 keyword 이름만 제공한다.
-따라서 초기 `ai-service`는 사용자별 확장이 아니라 키워드 단위 확장과 키워드 단위 뉴스 요약으로 설계한다.
-사용자별 알림 대상 매핑은 notification/history 단계에서 별도 계약으로 연결한다.
+`user-service`의 활성 키워드 internal API는 사용자 정보를 주지 않는다.
+키워드 확장과 뉴스 요약의 단위는 사용자가 아니라 키워드다.
 
 ## API
 
-현재 HTTP API는 `/api/v1` prefix를 사용한다.
+HTTP API는 `/api/v1` prefix를 사용한다.
 
 ### Internal
 
@@ -483,6 +485,9 @@ IntelliJ에서는 소스셋이 갈려 있어 `src/test` 전체를 어느 러너�
 - [테스트 전략](../docs/테스트전략.md)
 - [010. ai-service 초기 설계](../docs/decisions/010-ai-service-초기-설계.md)
 - [020. ai-service scheduler 실행 모델과 요약 window](../docs/decisions/020-ai-service-scheduler-실행-모델과-요약-window.md)
+- [022. ai-service outbox와 이벤트 발행 보장](../docs/decisions/022-ai-service-outbox와-이벤트-발행-보장.md)
+- [023. ai-service 도메인 이벤트 발행과 ai-contract](../docs/decisions/023-ai-service-도메인-이벤트-발행과-ai-contract.md)
+- [025. 키워드 구독과 알림 라우팅](../docs/decisions/025-키워드-구독과-알림-라우팅.md)
 - [030. ai-service LLM 호출 단위, 실패 분류, 실호출 검증](../docs/decisions/030-ai-service-llm-호출-단위와-실패-분류와-실호출-검증.md)
 - [031. 요약 단위를 키워드에서 story로](../docs/decisions/031-요약-단위를-키워드에서-story로.md)
 - [034. ai-service story 요약](../docs/decisions/034-ai-service-story-요약.md)

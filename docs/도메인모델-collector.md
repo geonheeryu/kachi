@@ -4,6 +4,8 @@ collector-service의 도메인 모델이다. 외부 뉴스 provider에서 뉴스
 수집 실행 한 번의 결과를 운영 기록으로 남긴다.
 공통 관례는 [도메인모델.md](도메인모델.md)를 따른다.
 
+관련 결정: ADR 008(뉴스 수집 실행 모델), 009(외부 뉴스 provider 연동 기준), 031(요약 단위를 story로), 032(기사 이벤트 발행과 collector-contract).
+
 ## 뉴스 애그리거트
 
 ### 뉴스(News)
@@ -34,7 +36,7 @@ _Aggregate Root_
 - 모든 속성이 있어야 기사다. 도메인에 null 속성은 없다.
   - 제목·발췌문·URL·언어·발행 시각 중 하나라도 없는 item은 provider adapter가 기사로 만들지 않는다.
 - URL hash는 같은 페이지의 재수집을 막는 값이다. 실제 저장 중복 방어는 persistence 계층의 `(source, urlHash)` unique index에서 처리한다.
-- 기사들 사이의 관계(같은 사건인가)는 collector가 판단하지 않는다. 그 일은 story 컨텍스트의 몫이다(ADR 031).
+- 기사들 사이의 관계(같은 사건인가)는 collector가 판단하지 않는다. 그 일은 story 컨텍스트의 몫이다.
 - 저장 후 수정하는 행위는 없다. 수집된 뉴스는 불변 기록이다.
 
 ### 뉴스 식별자(NewsId)
@@ -205,11 +207,9 @@ provider 수집 실패 사유 분류다.
 - `SERVER_ERROR`: provider 5xx 계열 오류
 - `NETWORK_ERROR`: 연결 실패, DNS 오류 같은 네트워크 오류
 - `INVALID_RESPONSE`: 응답 파싱 실패 또는 필수 필드 누락
-- `UNKNOWN`: 아직 분류하지 못한 오류
+- `UNKNOWN`: 분류하지 못한 오류
 
 ## outbox 애그리거트
-
-story·ai의 outbox와 같은 구조다(ADR 015·022·032). 컨텍스트 간 코드 공유 없이 각자 갖는다.
 
 ### 수집 outbox(CollectorOutbox)
 
@@ -218,7 +218,7 @@ _Aggregate Root_
 - 발행해야 할 기사 이벤트 1건과 그 발행 상태. `eventType`·`eventKey`·`partitionKey`·`payload`(생성 시점에 계약 JSON으로 고정)·`status`·`retryCount`·`nextRetryAt`·`lastError`·`publishedAt`·`claim` 등
 - 행위: `create`, `markPublishing(now, claimedBy)`, `markPublished(now)`, `recordFailure(reason, retryPolicy, now)`, `markDead(reason, now)`, `recoverToPending(now)`
 - 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, PUBLISHING -> PENDING(재시도), DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 CAS가 거른다
-- 뉴스 저장과 outbox 기록은 한 트랜잭션이다 (ADR 032)
+- 뉴스 저장과 outbox 기록은 한 트랜잭션이다
 
 ### 발행 소유권(CollectorOutboxClaim)
 
@@ -243,7 +243,7 @@ _Value Object_
 
 _Aggregate Root_
 
-`CollectionTargetType.MARKET_DATA`가 가리키는 수집 대상이지만 도메인 모델은 아직 없다.
+`CollectionTargetType.MARKET_DATA`가 가리키는 수집 대상이다. 도메인 모델은 미구현이다.
 
 - 시장 데이터는 뉴스 요약의 보조 정보로 사용한다.
 - 외부 API 실패는 전체 수집 흐름을 중단시키지 않고 실패 이력으로 남긴다.

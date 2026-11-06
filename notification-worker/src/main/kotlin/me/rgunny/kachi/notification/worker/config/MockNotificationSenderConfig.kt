@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
  * mock sender adapter 설정.
  *
  * sender adapter가 없으면 worker는 dispatch 메시지를 consume해도 실제 발송 단계에서 sender not found로 끝난다.
- * 초기 런타임 검증에서는 mock sender를 켜서 상태 전이와 retry classification을 먼저 확인하고,
+ * mock sender를 켜면 vendor 없이 상태 전이와 retry classification을 확인할 수 있다.
  * 실제 sender가 켜진 채널은 mock 지원 채널에서 자동 제외해 sender 중복을 막는다.
  */
 @Configuration

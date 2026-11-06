@@ -1,8 +1,10 @@
 # Story 컨텍스트 도메인 모델
 
 story-service의 도메인 모델이다. collector가 발행한 기사를 같은 사건 단위의 story로 조립하고,
-기사의 소속과 판정 기록을 정본으로 갖는다(ADR 031·033).
+기사의 소속과 판정 기록을 정본으로 갖는다.
 공통 관례는 [도메인모델.md](도메인모델.md)를 따른다.
+
+관련 결정: ADR 022(outbox와 이벤트 발행 보장), 030(실패 분류의 귀속·지속 두 축), 031(요약 단위를 story로), 033(story-service 조립).
 
 기사 사실(제목·발췌문·URL 등)의 정본은 collector다. 이 컨텍스트의 기사는 임베딩 입력과 재처리를 위한 사본이다.
 
@@ -149,7 +151,7 @@ _Value Object_
 _Enum_
 
 - `BGE_M3`: code `bge-m3`, 1024차원
-- 정체(code·modelId·차원)는 enum, 주소·시간은 yaml이다(ADR 030 방식). `ofCode`는 모르는 코드면 실패한다
+- 정체(code·modelId·차원)는 enum이, 주소·시간은 yaml이 정한다. `ofCode`는 모르는 코드면 실패한다
 
 ### 판정기(StoryJudge)
 
@@ -159,8 +161,6 @@ _Enum_
 - `THRESHOLD_ONLY`: judge 없이 검색 점수를 그대로 판정 점수로 쓴다. "코사인만" 구성이 설정 한 줄로 재현된다
 
 ## outbox 애그리거트
-
-collector·ai의 outbox와 같은 구조다(ADR 015·022·032·033). 컨텍스트 간 코드 공유 없이 각자 갖는다.
 
 ### 스토리 outbox(StoryOutbox)
 
@@ -190,14 +190,14 @@ _Value Object_
 
 ## 실패 모델
 
-ADR 030의 두 축(귀속 attribution, 지속 transient)을 따른다. TEI와 Qdrant는 프로토콜이 달라 코드 표를 따로 둔다.
+실패는 귀속(attribution)과 지속(transient) 두 축으로 분류한다. TEI와 Qdrant는 프로토콜이 달라 코드 표를 따로 둔다.
 
 ### 추론 실패(InferenceFailure)
 
 - `code`: `InferenceFailureCode`(귀속·transient 내장), `target`: `InferenceTarget`(`EMBEDDING`·`JUDGE`), `message`, `statusCode?`
-- INPUT 귀속(400·413·422)은 기사 결함으로 DLT, 나머지는 재시도 대상이다(ADR 033)
+- INPUT 귀속(400·413·422)은 기사 결함으로 DLT, 나머지는 재시도 대상이다
 
 ### 후보 색인 실패(CandidateIndexFailure)
 
-- `code`: `CandidateIndexFailureCode`(gRPC status code에서 매핑), attribution·transient 두 축은 추론 실패와 같다
+- `code`: `CandidateIndexFailureCode`(gRPC status code에서 매핑, 귀속·transient 내장)
 - 색인 실패는 전부 재시도 대상이다. 색인은 파생 캐시라 유실돼도 재구축으로 돌아온다

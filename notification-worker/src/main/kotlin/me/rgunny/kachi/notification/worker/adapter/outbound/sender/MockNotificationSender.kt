@@ -9,9 +9,9 @@ import me.rgunny.kachi.notification.domain.retry.RetryFailureCode
 import org.slf4j.LoggerFactory
 
 /**
- * 실제 vendor adapter가 붙기 전 worker dispatch 흐름을 검증하기 위한 mock sender.
+ * 설정된 채널 가운데 실제 sender가 켜지지 않은 채널의 발송을 받는 mock sender.
  *
- * 운영 발송 품질을 보장하는 구현이 아니라, Kafka listener -> core dispatch -> 상태 전이 경로를 닫기 위한 임시 adapter다.
+ * vendor를 부르지 않고 설정된 mode의 결과를 돌려준다.
  */
 class MockNotificationSender(
     private val channels: Set<NotificationChannel>,

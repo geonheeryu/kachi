@@ -71,9 +71,7 @@ user-service
 
 ---
 
-## 5. 현재 진행 상태
-
-현재는 `user-service`, `collector-service`, `story-service`, `ai-service`, `notification-service`의 기본 기능을 구현 중이다.
+## 5. 진행 상태
 
 도메인 세부 규칙은 [도메인 모델](./docs/도메인모델.md)을 기준으로 관리한다.  
 설계 결정의 배경과 trade-off는 [decisions](./docs/decisions)에 기록한다.

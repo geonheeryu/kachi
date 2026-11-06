@@ -43,7 +43,7 @@ _Aggregate Root_
 - 요약 대상 뉴스는 하나 이상이어야 하고, news hash·제목·본문은 빈 값일 수 없다.
 - 요약은 어떤 뉴스 묶음에서 생성되었는지 추적할 수 있어야 한다.
 - 같은 키워드, news hash, prompt version 조합은 중복 저장하지 않는다
-  (저장소 unique index로 방어하며, 같은 hash의 기존 요약은 재사용한다 — ADR 011). model은 기록 필드다.
+  (저장소 unique index로 방어하며, 같은 hash의 기존 요약은 재사용한다). model은 기록 필드다.
 - LLM 응답이 비어 있거나 필수 필드를 파싱할 수 없으면 실패로 처리하고 결과를 저장하지 않는다.
 
 ### 요약 식별자(NewsSummaryId)
@@ -70,7 +70,7 @@ _Domain Service_ (object)
 #### 규칙(Rules)
 
 - 뉴스 id를 정렬하고 중복 제거하므로 같은 뉴스 묶음은 조회 순서가 달라도 같은 hash가 된다.
-- 제목/본문의 유사도를 판단하는 값이 아니다. 같은 키워드·같은 뉴스 id 묶음의 요약인지 판별하는 중복 저장 방지 키다 (ADR 011).
+- 제목/본문의 유사도를 판단하는 값이 아니다. 같은 키워드·같은 뉴스 id 묶음의 요약인지 판별하는 중복 저장 방지 키다.
 - 뉴스 id 목록은 하나 이상이어야 한다.
 
 ## 워터마크
@@ -79,7 +79,7 @@ _Domain Service_ (object)
 
 _Aggregate Root_
 
-요약 처리를 끝낸 지점이다. 다음 실행은 이 지점에서 window를 시작하므로, 배포·장애로 멈춰 있던 구간도 재기동 후 이어서 처리한다 (ADR 020).
+요약 처리를 끝낸 지점이다. 다음 실행은 이 지점에서 window를 시작하므로, 배포·장애로 멈춰 있던 구간도 재기동 후 이어서 처리한다.
 
 #### 속성(Attributes)
 
@@ -96,8 +96,8 @@ _Aggregate Root_
 #### 규칙(Rules)
 
 - watermark는 앞으로만 움직인다. 뒤로 옮기는 연산은 두지 않으며, 
-  이미 처리한 구간을 다시 열 때는 운영자가 저장된 값을 직접 고친다 (ADR 020 — 후진 API를 만들지 않기로 결정).
-- `advanceTo`의 비교는 객체가 들고 있는 값 기준이라 여러 인스턴스의 동시 저장 경합은 막지 못한다 (단일 실행 전제 — ADR 020).
+  이미 처리한 구간을 다시 열 때는 운영자가 저장된 값을 직접 고친다. 후진 API는 없다.
+- `advanceTo`의 비교는 객체가 들고 있는 값 기준이라 여러 인스턴스의 동시 저장 경합은 막지 못한다 (단일 실행 전제).
 
 ### 요약 윈도우(SummaryWindow)
 
@@ -137,7 +137,6 @@ _Aggregate Root_
 
 키워드별 연속 실패 누적과 격리 상태다. 반복 실패하는 키워드 하나가 window 전체의 진행을
 막지 않도록 그 키워드만 파이프라인에서 걷어낸다. 
-notification의 DEAD 처리(ADR 015)와 같은 방식이다 (ADR 020).
 
 #### 속성(Attributes)
 
@@ -165,7 +164,7 @@ notification의 DEAD 처리(ADR 015)와 같은 방식이다 (ADR 020).
 - 격리된 키워드는 요약 대상과 watermark 전진 판단에서 제외된다. 
   격리 상태에서 들어온 실패/성공 기록은 무시한다 (격리 시점을 덮지 않는다).
 - 격리된 키워드만 해제할 수 있다. 자동 해제는 두지 않고 운영자가 원인 확인 후 해제한다.
-- 키워드 탓 실패만 연속 실패로 센다 (ADR 021).
+- 키워드 탓 실패만 연속 실패로 센다.
   LLM 실패는 시도한 후보 전부가 입력 탓으로 끝났을 때(`LlmProviderException.allInput`), 도메인 불변식 위반은 항상이다.
   모델·제공자·인프라 탓 실패는 세지 않는다.
 
@@ -187,7 +186,7 @@ _Enum_
 
 _Aggregate Root_
 
-story별 연속 실패 누적과 격리 상태다. 격리된 story는 요약 대상에서 빠진다 (ADR 034).
+story별 연속 실패 누적과 격리 상태다. 격리된 story는 요약 대상에서 빠진다.
 
 #### 속성(Attributes)
 
@@ -210,7 +209,7 @@ story별 연속 실패 누적과 격리 상태다. 격리된 story는 요약 대
 
 #### 규칙(Rules)
 
-- 격리 임계치는 1 이상이어야 하고, 연속 실패가 임계치에 도달하면 `QUARANTINED`로 전이한다. 임계치는 키워드 격리와 같은 설정 값이다.
+- 격리 임계치는 1 이상이어야 하고, 연속 실패가 임계치에 도달하면 `QUARANTINED`로 전이한다. 임계치는 설정 `kachi.ai.quarantine.failure-threshold`의 값이다.
 - 격리 상태에서 들어온 실패/성공 기록은 무시한다.
 - 격리된 story만 해제할 수 있다. 자동 해제는 두지 않는다.
 - story 탓 실패만 연속 실패로 센다.
@@ -220,12 +219,12 @@ story별 연속 실패 누적과 격리 상태다. 격리된 story는 요약 대
 ### story 격리 기록 식별자(StoryQuarantineId) · 상태(StoryQuarantineStatus)
 
 - `StoryQuarantineId`: _Value Object_. 격리 기록 식별 UUID, `newId()` / `of()`
-- `StoryQuarantineStatus`: _Enum_. `TRACKING`, `QUARANTINED`, `RELEASED`. 뜻은 키워드 격리 상태와 같다
+- `StoryQuarantineStatus`: _Enum_. `TRACKING`(임계치 미만으로 연속 실패 누적 중), `QUARANTINED`(임계치에 도달해 요약 대상에서 제외), `RELEASED`(운영자가 해제)
 
 ## story 사본 애그리거트
 
 story의 정본은 story-service이고 기사 사실의 정본은 collector다.
-ai-service는 `story.article.attached`·`story.merged`가 실어 온 값으로 사본을 만들고 요약은 이 사본만 읽는다 (ADR 034).
+ai-service는 `story.article.attached`·`story.merged`가 실어 온 값으로 사본을 만들고 요약은 이 사본만 읽는다.
 
 ### story 사본(AiStory)
 
@@ -342,7 +341,7 @@ _Enum_
 - `NEW_STORY`: 새 기사 전부가 이 story와 다른 사건이다. 분리 요청을 낸다
 - `DEVELOPMENT`: 직전 요약에 없던 정보가 더해졌다. 요약 생성 이벤트를 낸다
 - `NO_CHANGE`: 직전 요약 대비 새 정보가 없다. 이벤트를 내지 않는다
-- 세 경우 모두 버전을 저장하고 기사를 실린 것으로 표시한다 (ADR 034).
+- 세 경우 모두 버전을 저장하고 기사를 실린 것으로 표시한다.
 
 ## 실행 기록
 
@@ -408,7 +407,7 @@ _Enum_
 
 _Enum_
 
-키워드를 요약하지 않고 건너뛴 이유 분류다. skip은 실패가 아니다 — 조치할 것이 없는 실행과 원인을 봐야 하는 실행을 실행 기록에서 구분한다 (ADR 021).
+키워드를 요약하지 않고 건너뛴 이유 분류다. skip은 실패가 아니다. 조치할 것이 없는 실행과 원인을 봐야 하는 실행을 실행 기록에서 구분한다.
 
 - `NO_INPUT`: 이 구간에 요약할 뉴스가 없었다. collector가 정상 응답으로 빈 결과를 준 경우다.
 - `PROVIDER_UNAVAILABLE`: 호출할 수 있는 후보 모델이 없어 이번 실행에서 호출하지 않았다.
@@ -424,8 +423,7 @@ AI 처리 실패 사유 분류다. 실행 기록과 격리 기록에 남는다.
 - `PROVIDER_UNAVAILABLE`: 호출할 수 있는 LLM 모델이 없어 요청을 보내지 못했다.
 - `MODEL_NOT_FOUND`: 제공이 끝났거나 이름이 틀린 모델을 불렀다.
 - `ACCOUNT_ERROR`: 제공자 계정 문제. 인증 실패, 결제 필요, 권한이나 한도.
-- `EMPTY_INPUT`: 뉴스 없음은 skip으로 분리되어(ADR 021) 새 실행은 이 값을 쓰지 않는다.
-  이전 실행 기록을 읽기 위해 남겨둔 값이다.
+- `EMPTY_INPUT`: 저장된 실행 기록에만 있는 값이다. 뉴스 없음은 skip으로 기록하므로 실행은 이 값을 쓰지 않는다.
 
 ## outbox 애그리거트
 
@@ -433,7 +431,7 @@ AI 처리 실패 사유 분류다. 실행 기록과 격리 기록에 남는다.
 
 _Aggregate Root_
 
-발행해야 할 도메인 이벤트 1건과 그 발행 상태다. 도메인 상태 변경과 한 트랜잭션으로 기록한다 (ADR 022).
+발행해야 할 도메인 이벤트 1건과 그 발행 상태다. 도메인 상태 변경과 한 트랜잭션으로 기록한다.
 
 #### 속성(Attributes)
 
@@ -490,7 +488,7 @@ _Value Object_
 
 ## LLM 호출 단위
 
-`domain/llm`의 enum이 어느 규격의 어느 제공자·모델을 어느 용도로 부르는지 정한다. 주소·키·시간·후보 순서만 yaml이다 (ADR 030).
+`domain/llm`의 enum이 어느 규격의 어느 제공자·모델을 어느 용도로 부르는지 정한다. 주소·키·시간·후보 순서만 yaml이다.
 
 ### API 규격(LlmApi)
 
@@ -544,7 +542,7 @@ _Value Object_
 _Value Object_
 
 - `use`, `version`(`PromptVersion`), `system`, `maxTokens`
-- 용도마다 object 하나가 본문과 버전을 한 파일에 둔다. 본문·입력 모양·출력 형식이 바뀔 때만 버전을 올리고 모델 교체는 대상이 아니다 (ADR 030).
+- 용도마다 object 하나가 본문과 버전을 한 파일에 둔다. 본문·입력 모양·출력 형식이 바뀔 때만 버전을 올리고 모델 교체는 대상이 아니다.
 - user 메시지는 자연어가 아니라 입력 객체의 JSON이다. system이 그 값을 인용 데이터로 선언해 기사 제목·키워드 속 지시문이 명령으로 읽히지 않게 한다.
 - 요약 입력은 `NewsSummaryPrompt.Article`(source·title·publishedAt)이다. domain이 application의 뉴스 모델을 import하지 않기 위해서다.
 - story 요약 입력은 story 키워드, 직전 버전 요약(`StorySummaryPrompt.PreviousSummary`, 첫 버전은 null), 새 기사(`StorySummaryPrompt.Article`: source·title·excerpt·publishedAt)다. 응답에는 `developmentKind`가 더해진다.
@@ -564,7 +562,7 @@ _Value Object_
 _Value Object_
 
 LLM 호출 실패 하나를 표준 코드와 함께 보존하는 값이다.
-소비처가 내리는 판단마다 파생 프로퍼티가 하나 있고, 판단 축은 모두 `code`에서 파생한다 (ADR 021·030).
+소비처가 내리는 판단마다 파생 프로퍼티가 하나 있고, 판단 축은 모두 `code`에서 파생한다.
 
 #### 속성(Attributes)
 
@@ -622,8 +620,6 @@ LLM 실패의 책임이 어디 있는가다. 같은 실패라도 책임에 따�
 - `PROVIDER`: 계정과 endpoint. 그 제공자의 모든 모델이 같다.
 - `NONE`: 우리 가드가 호출 전에 막았다. 어느 쪽 상태도 말해 주지 않는다.
 
-notification의 `RetryFailure`와 어휘를 맞추되 코드는 공유하지 않는다 (bounded context 독립 — ADR 021).
-
 ### 토큰 사용량(TokenUsage)
 
 _Value Object_
@@ -637,14 +633,14 @@ _Value Object_
 
 _Aggregate Root_
 
-키워드 하나를 LLM으로 확장한 결과다. (유스케이스는 현재 비활성 — ADR 010 보류 유지)
+키워드 하나를 LLM으로 확장한 결과다.
 
 #### 속성(Attributes)
 
 - `id`: `KeywordExpansionId` 확장 식별자
 - `keyword`: `AiKeyword` 원본 키워드
 - `expandedKeywords`: `List<ExpandedKeyword>` 확장 키워드 목록
-- `provider`: `LlmProvider` / `requestedModel` / `model` / `promptVersion`: 사용한 LLM 정보 (뉴스 요약과 같다)
+- `provider`: `LlmProvider` / `requestedModel` / `model` / `promptVersion`: 사용한 LLM 정보
 - `createdAt`: 생성 시각
 
 #### 행위(Behaviors)
@@ -656,7 +652,7 @@ _Aggregate Root_
 
 - 정규화 후 확장 키워드는 하나 이상이어야 한다.
 - 확장 키워드는 원본 키워드와 함께 추적되어야 한다.
-- 같은 원본 키워드, prompt version 조합은 중복 저장하지 않는다 (저장소 unique 제약 — ADR 011). model은 기록 필드다.
+- 같은 원본 키워드, prompt version 조합은 중복 저장하지 않는다 (저장소 unique 제약). model은 기록 필드다.
 - LLM 응답이 비어 있거나 파싱할 수 없으면 실패로 처리하고 결과를 저장하지 않는다.
 
 ### 확장 식별자(KeywordExpansionId)

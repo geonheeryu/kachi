@@ -5,7 +5,7 @@
 `collector-service`·`ai-service`는 수집 대상 키워드를 직접 소유하지 않고 이 서비스의 internal API에서 활성 키워드를 조회한다.
 notification-routing과 notification-worker는 같은 internal API로 키워드·역할의 수신자와 수신 주소를 조회한다.
 
-## 현재 구현 상태
+## 구현 상태
 
 - `User`, `Keyword`(canonical), `Subscription`, `ChannelBinding` 도메인 모델
 - OAuth2 provider 기반 사용자 식별
@@ -22,7 +22,7 @@ notification-routing과 notification-worker는 같은 internal API로 키워드�
 
 ## API
 
-현재 HTTP API는 `/api/v1` prefix를 사용한다.
+HTTP API는 `/api/v1` prefix를 사용한다.
 
 ### Auth
 
@@ -190,7 +190,7 @@ Authorization: Bearer {accessToken}
 ### Internal
 
 internal API는 `/api/v1/internal/**`이며 인증 없이 열려 있다. 같은 호스트의 서비스끼리만 호출한다는 전제이고,
-외부 ingress를 붙이는 시점이 공유 토큰 인증을 넣는 조건이다(ADR 026).
+외부 ingress를 붙이는 시점이 공유 토큰 인증을 넣는 조건이다.
 응답은 모두 `{ "success", "data", "error" }`로 감싼다.
 
 활성 키워드 조회 — collector-service·ai-service가 호출한다:

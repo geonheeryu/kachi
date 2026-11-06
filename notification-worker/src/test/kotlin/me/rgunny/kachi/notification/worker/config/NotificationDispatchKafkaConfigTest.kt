@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
  * dispatch listener 전용 container factory의 조립을 본다.
  *
  * listener는 처리 결과를 보고 직접 acknowledge()하므로 factory가 MANUAL이 아니면 모든 레코드가 처리 전에 실패한다.
- * `spring.kafka.listener.ack-mode`는 직접 만든 factory에 적용되지 않아 e2e에서 드러났던 결함이다(ADR 029).
+ * `spring.kafka.listener.ack-mode`는 직접 만든 factory에 적용되지 않는다(ADR 029).
  */
 class NotificationDispatchKafkaConfigTest {
 

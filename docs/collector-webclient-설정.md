@@ -24,7 +24,7 @@
 | `write-timeout` | `5s` | 요청 write 정지를 방어한다. | POST/큰 body 요청 provider에서 조정한다. |
 | `max-in-memory-size` | `524288` | 응답 body 버퍼링 메모리를 제한한다. | XML/JSON 응답 크기 측정 후 조정한다. |
 
-초기값은 보수적인 시작점이다. provider별 평균 응답 시간, timeout 빈도, 응답 크기가 쌓이면 조정한다.
+기본값은 보수적인 시작점이다. provider별 평균 응답 시간, timeout 빈도, 응답 크기가 쌓이면 조정한다.
 
 ## Bean 구성 기준
 
@@ -68,7 +68,7 @@ kachi:
       {provider-name}:
 ```
 
-현재 provider 설정은 다음과 같은 구조를 따른다.
+provider 설정은 다음 구조를 따른다.
 
 ```yaml
 kachi:
@@ -113,7 +113,7 @@ kachi:
 | endpoint | `/rss/search` |
 | 검색어 query | `q` |
 | 지역/언어 query | `hl`, `gl`, `ceid` |
-| 장점 | API key 없이 초기 수집 흐름 검증 가능 |
+| 장점 | API key 없이 수집 가능 |
 | 한계 | 공식 안정 JSON API가 아니며 응답 구조나 접근 제한이 바뀔 수 있음 |
 | URL 특성 | Google redirect URL이 내려올 수 있음 |
 
@@ -121,11 +121,11 @@ kachi:
 
 | 설정 | 값 | 근거 |
 | --- | --- | --- |
-| `enabled` | `true` | API key 없이 사용할 수 있어 초기 provider로 활성화한다. |
+| `enabled` | `true` | API key 없이 사용할 수 있어 기본으로 활성화한다. |
 | `base-url` | `https://news.google.com` | provider host와 endpoint path를 분리한다. |
 | `rss-search-path` | `/rss/search` | Google News RSS 검색 endpoint다. |
-| `language-code` | `ko` | 초기 서비스 타깃을 한국어 뉴스로 둔다. |
-| `country-code` | `KR` | 초기 서비스 타깃을 한국 뉴스 기준으로 둔다. |
+| `language-code` | `ko` | 서비스 타깃을 한국어 뉴스로 둔다. |
+| `country-code` | `KR` | 서비스 타깃을 한국 뉴스 기준으로 둔다. |
 | `connect-timeout` | `2s` | 공통 기본값을 따른다. |
 | `response-timeout` | `5s` | 공통 기본값을 따른다. |
 | `read-timeout` | `5s` | RSS XML body read 정지를 방어한다. |
@@ -198,7 +198,7 @@ Naver 응답 변환 기준:
 | `base-url` | `https://finnhub.io` | provider host와 endpoint path를 분리한다. |
 | `company-news-path` | `/api/v1/company-news` | Finnhub Company News endpoint다. |
 | `api-key` | `${FINNHUB_API_KEY}` | Finnhub API 인증 header에 사용한다. |
-| `lookback-days` | `7` | 최근 7일 회사 뉴스를 조회하는 초기값이다. |
+| `lookback-days` | `7` | 최근 7일 회사 뉴스를 조회한다. |
 | `max-in-memory-size` | `524288` | JSON body 역직렬화에 512KB 상한을 둔다. |
 
 Finnhub 응답 변환 기준:
@@ -209,7 +209,7 @@ Finnhub 응답 변환 기준:
 - `url`을 원문 URL로 사용한다.
 - `datetime`은 UNIX timestamp seconds로 파싱하고, 없거나 epoch 이전이면 `publishedAt=null`로 둔다.
 
-## 추후 조정 기준
+## 조정 기준
 
 다음 데이터가 쌓이면 설정값을 조정한다.
 

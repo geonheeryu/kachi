@@ -6,7 +6,6 @@ import java.time.Instant
  * 발행해야 할 도메인 이벤트 1건과 그 발행 상태.
  *
  * 도메인 상태 변경과 이벤트 기록을 한 트랜잭션에 묶어, 상태는 바뀌었는데 알림이 없는 경우를 없앤다.
- * 상태전이는 ADR 015와 같다.
  *
  * ```
  * PENDING ──claim──▶ PUBLISHING ──publish ok──▶ PUBLISHED (terminal)

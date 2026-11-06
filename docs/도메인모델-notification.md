@@ -10,7 +10,7 @@ notification-service(접수·outbox 발행)와 notification-worker(dispatch·ven
 
 이 컨텍스트의 상태 전이 aggregate는 불변이다. 전이 메서드는 전이 결과를 새 인스턴스로 반환하고 전이 전 인스턴스는 그대로 남는다.
 전이 가드는 최종 방어선이며, 외부 side effect(Kafka 발행, vendor 호출) 뒤의 결과 확정은 전이 전 인스턴스가 들고 있던 claim을
-기대값으로 하는 저장소 CAS로만 한다 (ADR 024).
+기대값으로 하는 저장소 CAS로만 한다.
 
 ## 알림 애그리거트
 
@@ -26,7 +26,7 @@ _Aggregate Root_
 - `requestId`: upstream 요청 멱등 키
 - `requester`: 요청 주체
 - `channel`: `NotificationChannel` 발송 채널
-- `recipientId`: 수신자 식별자(user-service 사용자 id). 주소가 아니며 주소(`address`)는 worker가 발송 직전에 `(recipientId, channel)`로 조회해 sender에만 넘긴다. 알림에는 남지 않는다 (ADR 028)
+- `recipientId`: 수신자 식별자(user-service 사용자 id). 주소가 아니며 주소(`address`)는 worker가 발송 직전에 `(recipientId, channel)`로 조회해 sender에만 넘긴다. 알림에는 남지 않는다
 - `message`: 발송 메시지 (null 허용, 빈 문자열 불가)
 - `origin`: `NotificationOrigin` 출처(summaryId, keyword, userId). 요청 계약에 실려 온 알림만 값을 가진다
 - `requestedAt`: 최초 접수 시각
@@ -60,7 +60,7 @@ _Aggregate Root_
 - 같은 상태로의 재전이는 멱등으로 무시한다 (중복 메시지 대비).
 - `SENT`·`DEAD`·`SUPPRESSED`는 자동 처리의 종착 상태다.
 - 모든 상태 전이는 `uncommittedHistories`에 `NotificationHistory`로 쌓이고, 
-  현재 상태 변경과 같은 MongoDB 트랜잭션에서 원자적으로 저장된다 (ADR 017).
+  현재 상태 변경과 같은 MongoDB 트랜잭션에서 원자적으로 저장된다.
 - claim 정보는 `PROCESSING`일 때만 존재한다. `claimedAt`/`claimedBy`는 함께 있거나 함께 없다.
 - 수동 복구는 이전 실패 사유를 history에 남기고 현재 snapshot의 `failureReason`,
   `dispatchAttempts`, claim 정보를 초기화하며 새 dispatch outbox를 생성한다.
@@ -89,7 +89,7 @@ _Enum_
 - `FAILED`: sender 호출 실패, `RETRY_WAIT` 또는 `DEAD` 분기 직전
 - `RETRY_WAIT`: retry topic/backoff 후 재시도 가능한 상태
 - `SENT`: 외부 채널 발송 성공
-- `SUPPRESSED`: 스킵. 수신 주소가 없거나 이미 보낸 알림이라 vendor를 부르지 않고 종료 (ADR 028)
+- `SUPPRESSED`: 스킵. 수신 주소가 없거나 이미 보낸 알림이라 vendor를 부르지 않고 종료
 - `DEAD`: 자동 재시도 종료, 운영자 수동 재처리 대상 (DLT 진입과 함께)
 
 ### 알림 채널(NotificationChannel)
@@ -112,7 +112,7 @@ _Value Object_
 _Aggregate Root_
 
 요청 접수와 worker용 dispatch message 발행 사이의 유실을 막는 발행 보장 대기열이다.
-같은 트랜잭션에서 notification과 outbox를 함께 commit한 뒤, 즉시 경로(AFTER_COMMIT listener) 또는 폴링이 broker로 발행한다 (ADR 015).
+같은 트랜잭션에서 notification과 outbox를 함께 commit한 뒤, 즉시 경로(AFTER_COMMIT listener) 또는 폴링이 broker로 발행한다.
 
 #### 속성(Attributes)
 
@@ -143,7 +143,7 @@ _Aggregate Root_
 - 알림 요청 접수와 dispatch outbox 저장은 같은 저장 경계에서 확정한다.
 - `PENDING`만 `PUBLISHING`으로 claim할 수 있고, `PUBLISHING`만 `PUBLISHED`/`PENDING`/`DEAD`로 전이할 수 있다.
 - claim에 성공한 인스턴스만 publish를 수행하며, 결과는 callback에서 별도 트랜잭션으로 반영한다.
-  늦은 callback은 `PUBLISHING`일 때만 반영하며, 이 조건은 저장소가 `_id + PUBLISHING + claim` CAS로 강제한다 (ADR 015, 024).
+  늦은 callback은 `PUBLISHING`일 때만 반영하며, 이 조건은 저장소가 `_id + PUBLISHING + claim` CAS로 강제한다.
 - 오래된 `PUBLISHING`은 publisher 중단으로 보고 stale 회수 대상에 포함한다
   (`publishingVisibilityTimeout`).
 - claim은 동시 발행을 막는 1차 방어선이다. publish 성공 후 DB 반영 전 timeout 회수가
@@ -240,7 +240,7 @@ Kafka retry가 끝나 DLT에 도달한 `notification.dispatch` record의 운영�
   빈 문자열까지 도메인에서 강하게 차단하지 않는다.
 - `PENDING`은 종료 필드를 갖지 않고, `DISCARDED`와 `REPROCESSED`는 서로의 종료 필드를 함께 갖지 않는다. 
   종료 시각과 사유는 함께 있거나 함께 없다.
-- `REPROCESSED`는 후속 재처리 API에서 사용할 처리 완료 상태다 (전이 행위는 아직 없다).
+- `REPROCESSED`는 재처리 완료 상태다. 이 상태로 가는 전이 행위는 미구현이다.
 - 운영 목록 조회는 payload를 제외하고, 상세 조회에서 재처리 판단을 위해 payload를 노출한다.
 
 ### DLT 메시지 상태(NotificationDltMessageStatus)
@@ -261,9 +261,8 @@ _Value Object_
 ## 재시도 모델
 
 `domain/retry/` 패키지에 있다. 기술에 의존하지 않는 순수 모델로, 실패 분류와 재시도 결정이라는
-도메인 규칙을 담는다 (ADR 014). 재시도 예외(`RetryException`, `RetryableException`,
+도메인 규칙을 담는다. 재시도 예외(`RetryException`, `RetryableException`,
 `NonRetryableException`)는 `exception/`에 있다.
-ai의 `LlmFailure` 계열과 어휘를 정렬하되 코드는 공유하지 않는다 (ADR 021).
 
 ### 재시도 실패(RetryFailure)
 
@@ -288,7 +287,6 @@ sender, broker, database, network, application 실패를 retry 정책이 판단�
 #### 규칙(Rules)
 
 - retry 가능 여부는 code 문자열이 아니라 `source`와 `category`로 판단한다.
-- ai의 `LlmFailure`와 달리 `external()`을 유지한다 — vendor 원문 코드 보존에 실제로 쓰이기 때문이며, 두 모듈의 모양 차이는 의도된 것이다.
 
 ### 재시도 실패 코드(RetryFailureCode)
 
@@ -359,6 +357,5 @@ _Domain Service_
 
 _Exception_
 
-`RetryFailure`를 담는 예외 계층이다. notification에서는 예외 타입이 제어 신호다.
+`RetryFailure`를 담는 예외 계층이다. 예외 타입이 제어 신호다.
 worker의 dispatch 흐름과 spring-kafka 에러 핸들러(`addNotRetryableExceptions`)가 catch 타입만으로 재시도/DEAD를 결정한다. 
-값 판정만 하는 ai-service가 타입을 나누지 않는 것과 대비되는, 경계 프로토콜 요구에 따른 의도된 차이다 (ADR 021).
