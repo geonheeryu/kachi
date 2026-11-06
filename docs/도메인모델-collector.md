@@ -207,6 +207,38 @@ provider 수집 실패 사유 분류다.
 - `INVALID_RESPONSE`: 응답 파싱 실패 또는 필수 필드 누락
 - `UNKNOWN`: 아직 분류하지 못한 오류
 
+## outbox 애그리거트
+
+story·ai의 outbox와 같은 구조다(ADR 015·022·032). 컨텍스트 간 코드 공유 없이 각자 갖는다.
+
+### 수집 outbox(CollectorOutbox)
+
+_Aggregate Root_
+
+- 발행해야 할 기사 이벤트 1건과 그 발행 상태. `eventType`·`eventKey`·`partitionKey`·`payload`(생성 시점에 계약 JSON으로 고정)·`status`·`retryCount`·`nextRetryAt`·`lastError`·`publishedAt`·`claim` 등
+- 행위: `create`, `markPublishing(now, claimedBy)`, `markPublished(now)`, `recordFailure(reason, retryPolicy, now)`, `markDead(reason, now)`, `recoverToPending(now)`
+- 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, PUBLISHING -> PENDING(재시도), DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 CAS가 거른다
+- 뉴스 저장과 outbox 기록은 한 트랜잭션이다 (ADR 032)
+
+### 발행 소유권(CollectorOutboxClaim)
+
+_Value Object_
+
+- `claimedBy`, `claimedAt`. PUBLISHING 상태에서만 존재한다
+
+### outbox 식별자(CollectorOutboxId) · 상태(CollectorOutboxStatus) · 이벤트 종류(CollectorOutboxEventType)
+
+- `CollectorOutboxId`: outbox 식별 UUID
+- `CollectorOutboxStatus`: `PENDING`, `PUBLISHING`, `PUBLISHED`, `DEAD`
+- `CollectorOutboxEventType`: `NEWS_COLLECTED`. `collector.news.collected`로 나간다
+
+### 재시도 정책(CollectorOutboxRetryPolicy)
+
+_Value Object_
+
+- `maxAttempts`, `baseDelay`, `maxDelay`, `multiplier`, `jitterRatio`
+- `backoff(attempts)`: 지수 backoff에 ±jitter를 더한 대기 시간. `exhausted(attempts)`가 DEAD 판정 기준이다
+
 ## 시장 데이터(MarketData) — 계획, 미구현
 
 _Aggregate Root_

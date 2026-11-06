@@ -112,7 +112,7 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
 - **Qdrant 벡터 양자화**: rebuild로 되돌릴 수 있는 결정이고 로컬에서 효과를 못 잰다. float32 무양자화로 시작하고 운영 메모리 측정 뒤 판단한다.
 - **판정기 상수에 LLM 유지**: 구현 없는 enum 상수는 config에 미지원 분기를 만든다(ADR 030). 지웠고, 필요 시 adapter 하나로 돌아온다.
 - **병합 job의 전수 스캔**: 창 밖에서 뒤늦게 가까워진 쌍도 잡지만 틱 비용이 누적 story 수에 비례한다. 창 밖 쌍은 다음 기사가 들어올 때 조립 후보로 다시 만나므로, 남는 것은 재현율 문제이지 정합성 문제가 아니다.
-- **분리·닫힘 이벤트 발행**: 소비자(ai-service)가 아직 없어 계약을 정할 근거가 없다. `NEW_STORY` 분리 이벤트의 소비 시점은 열린 항목이다.
+- **분리·닫힘 이벤트 발행**: 소비자가 없어 계약을 정할 근거가 없다. `NEW_STORY` 분리 이벤트의 소비 시점은 열린 항목이다.
 
 ## 트레이드오프
 
@@ -130,7 +130,7 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
 
 ## 후속
 
-- ADR 034: ai-service가 `story.article.attached`를 소비해 story를 요약한다.
+- ADR 034: ai-service가 `story.article.attached`·`story.merged`를 소비해 story를 요약한다.
 - `NEW_STORY` 분리 이벤트의 소비 시점, Schema Registry 도입 위치는 열린 항목이다.
 - 메트릭은 collector·ai와 함께 별도 결정으로 다룬다(ADR 019 이후).
 

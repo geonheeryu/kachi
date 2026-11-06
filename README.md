@@ -57,7 +57,8 @@ Kachi는 사용자가 등록한 관심 키워드를 기준으로 뉴스와 시�
 user-service
   └─ 키워드 구독·채널 바인딩 등록/관리
       -> collector-service: 활성 키워드 조회(HTTP internal) 후 뉴스 수집, `collector.news.collected` 발행
-          -> story-service: 기사를 같은 사건 단위 story로 조립, `story.article.attached`·`story.merged` 발행 (소비자는 ADR 034 예정)
+          -> story-service: 기사를 같은 사건 단위 story로 조립, `story.article.attached`·`story.merged` 발행
+              -> ai-service: story 이벤트를 받아 story 단위로 요약 버전 생성
           -> ai-service: 수집 뉴스를 키워드별로 LLM 요약 (newsHash 중복 방지), `ai.summary.created`·`ai.keyword.quarantined` 발행
               -> notification-routing: ai 이벤트를 구독자·관리자 x 채널로 fan-out해 `notification.requested` 발행
               -> notification-service: 알림 접수, outbox 발행
@@ -82,7 +83,7 @@ user-service
 | `user-service` | 사용자, canonical 키워드·구독, 채널 바인딩(암호화 주소, Telegram 연결 링크), 활성 키워드·구독·바인딩 internal API, OAuth2/JWT, refresh token, MySQL/Redis 저장소 구현 | [user-service README](./user-service/README.md) |
 | `collector-service` | 뉴스 도메인, Google/Naver/Finnhub provider, user-service 키워드 조회, MongoDB 저장, scheduler/internal API 실행 진입점, 기사 outbox 기록과 relay의 `collector.news.collected` 발행(`collector-contract` 모듈) 구현 | [collector-service README](./collector-service/README.md) |
 | `story-service` | story·기사 사본·판정 기록 도메인, TEI 임베딩·판정기 adapter와 서킷, Qdrant gRPC 후보 색인, `collector.news.collected` 소비와 2단계 판정 조립, 닫기·병합·색인 정리 주기 작업, 조회·병합·분리·색인 재구축·outbox 운영 internal API, outbox relay의 `story.article.attached`/`story.merged` 발행(`story-contract` 모듈) 구현 | [story-service README](./story-service/README.md) |
-| `ai-service` | 뉴스 요약 실행 구현: 키워드별 LLM 요약, newsHash 중복 방지, AiRun 실행 기록, 용도별 후보 모델(enum)과 모델 단위 서킷·cooldown·hold, 순차 failover, 실패의 책임·지속 분류와 전 후보 합의 격리, 코드에 둔 프롬프트 버전, `src/realTest` 실호출 검증, MongoDB 저장, 요약/격리 이벤트 outbox 기록과 relay, `ai.summary.created`/`ai.keyword.quarantined` Kafka 발행(`ai-contract` 모듈), scheduler/internal API 진입점, 격리·watermark·outbox 운영 internal API, LLM 모델 상태·reset·probe internal API | [ai-service README](./ai-service/README.md) |
+| `ai-service` | 뉴스 요약 실행 구현: 키워드별 LLM 요약, newsHash 중복 방지, AiRun 실행 기록, 용도별 후보 모델(enum)과 모델 단위 서킷·cooldown·hold, 순차 failover, 실패의 책임·지속 분류와 전 후보 합의 격리, 코드에 둔 프롬프트 버전, `src/realTest` 실호출 검증, MongoDB 저장, 요약/격리 이벤트 outbox 기록과 relay, `ai.summary.created`/`ai.keyword.quarantined` Kafka 발행(`ai-contract` 모듈), scheduler/internal API 진입점, 격리·watermark·outbox 운영 internal API, LLM 모델 상태·reset·probe internal API. story 요약 구현: `story.article.attached`/`story.merged` 소비, story·기사 사본, `(storyId, version)` 요약 버전, story 격리, story 요약·격리 internal API | [ai-service README](./ai-service/README.md) |
 | `notification-service` | notification-routing/core/service/worker/contract 모듈 구성, `ai.summary.created`·`ai.keyword.quarantined` 소비와 구독자 x 채널 fan-out(`notification.requested` 발행, RoutingJob 멱등), 요청 접수, MongoDB outbox, Kafka dispatch 발행, worker dispatch, mock/Slack/Discord/Telegram sender, retry/DLT 영속화와 운영 조회/폐기, stale PUBLISHING/PROCESSING 회수, DEAD 운영 조회/수동 복구 구현 | [notification 종합 문서](./docs/README-notification.md) |
 | `history-service` | 미구현 | - |
 
@@ -187,10 +188,13 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 ```sh
 ./gradlew :user-service:test
 ./gradlew :collector-service:test
+./gradlew :story-service:test
+./gradlew :ai-service:test
 ./gradlew :notification-core:test
 ./gradlew :notification-routing:test
 ./gradlew :notification-service:test
 ./gradlew :notification-worker:test
+./gradlew :e2e-test:e2eTest
 ```
 
 테스트 분류와 인프라 연동 테스트 기준은 [테스트 전략](./docs/테스트전략.md)을 따른다.
@@ -244,4 +248,5 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 | [031. 요약 단위를 키워드에서 story로](./docs/decisions/031-요약-단위를-키워드에서-story로.md) | TDT 틀에서 같은 사건의 기사를 story로 묶는 방향, 세 층의 중복 제거, 모델 네 종류(임베딩·판정기·생성형·벡터 저장소)의 역할, 서비스 경계와 데이터 소유, 벡터 색인은 파생 캐시 |
 | [032. collector 기사 이벤트 발행과 collector-contract](./docs/decisions/032-collector-기사-이벤트-발행과-collector-contract.md) | 발췌문·URL 정규화 기사 모델, collector outbox와 relay, `collector.news.collected` 계약과 compact+delete topic, 발행·relay 스위치 분리 |
 | [033. story-service 조립](./docs/decisions/033-story-service-조립.md) | story·기사 사본 도메인, 골드셋으로 정한 2단계 판정 임계값, Mongo 먼저 색인 다음의 이중 쓰기, 닫기·병합·정리와 색인 자가 수리, Qdrant gRPC 채택 측정, delete 정책 topic 둘 |
+| [034. ai-service story 요약](./docs/decisions/034-ai-service-story-요약.md) | story·기사 사본으로 요약, 미요약 수 즉시 트리거와 대기 상한 tick, `(storyId, version)` 멱등과 story CAS, `developmentKind`별 발행, story 격리, `ai.summary.created` schemaVersion 2와 발행 스위치 |
 | [036. 실행 lock 포트 분리와 lock 범위](./docs/decisions/036-실행-lock-포트-분리와-lock-범위.md) | 중복 실행 방지를 `ExecutionLockPort`로 분리, 실행 단위마다 `INSTANCE`·`CLUSTER` 범위 선언, outbox relay가 `INSTANCE`인 이유 |

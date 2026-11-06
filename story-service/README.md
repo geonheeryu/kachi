@@ -149,5 +149,4 @@ TEI·Qdrant 주소는 `.env`의 `KACHI_STORY_TEI_EMBEDDING_BASE_URL`·`KACHI_STO
 
 ## 다음 작업
 
-- ai-service가 `story.article.attached`를 소비해 story 단위로 요약한다(ADR 034 예정). 그때까지 발행된 이벤트는 소비자 없이 보존 기간 안에 쌓인다.
 - 분리(`NEW_STORY`) 이벤트 발행과 Schema Registry 도입은 열린 결정이다(ADR 033).
