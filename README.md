@@ -8,18 +8,6 @@
 
 Kachi는 사용자가 등록한 관심 키워드를 기준으로 뉴스와 시장 데이터를 수집하고, AI로 키워드를 확장하거나 뉴스를 요약한 뒤, Slack/Discord/Telegram 같은 외부 채널로 알림을 발송하는 서비스다.
 
-### 구현 체크리스트
-
-- [x] 멀티모듈 프로젝트
-- [x] 도메인 문서 초안
-- [x] 헥사고날 아키텍처 패키지 규칙 정리
-- [x] `user-service` 기본 기능
-- [x] `collector-service` 뉴스 수집 기본 기능
-- [x] `story-service` 기사 story 조립 기본 기능
-- [ ] `ai-service`
-- [x] `notification-service` 알림 요청/outbox/worker dispatch 기본 흐름
-- [ ] `history-service`
-
 ---
 
 ## 2. 기술 스택

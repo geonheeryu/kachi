@@ -11,7 +11,7 @@
 ## 구조 규칙
 
 - 계층과 배치 규칙은 각 서비스 모듈의 `src/test/.../architecture/ArchitectureTest.kt`(ArchUnit)가 검사한다. 아직 규칙을 어기고 있는 곳은 `@ArchIgnore(reason)`으로 표시한다.
-- outbound adapter 패키지는 기술을 먼저, 기능을 그 아래에 둔다. 포트 패키지는 기능별로 나누고 adapter 하위 패키지와 1:1로 대응시킨다.
+- 패키지를 새로 만들거나 옮길 때는 `docs/패키지구조.md`를 먼저 읽는다.
 - 발송 경로는 수신자, 채널, 주소, 내용만 입력으로 받는다. 관리자 분기 같은 특수 처리를 넣지 않는다.
 - 수신자를 나타내는 용어는 `recipientId`, `channel`, `address` 셋이다. 합성어와 리터럴 `admin`을 쓰지 않는다.
 

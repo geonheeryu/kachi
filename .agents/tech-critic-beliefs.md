@@ -7,7 +7,7 @@
 규칙의 설명은 `docs/아키텍처.md`, `docs/패키지구조.md`, `docs/개발가이드.md`에 있고, 검사는 각 모듈의 `ArchitectureTest.kt`가 한다. 판정에 쓰는 기준은 다음과 같다.
 
 - 의존 방향은 `adapter -> application -> domain`이다. 도메인은 Spring, JPA, Mongo, Kafka에 의존하지 않는다.
-- 포트 패키지는 기능별로 나누고 adapter 하위 패키지와 1:1로 대응시킨다. outbound adapter의 첫 단계 패키지는 기술 이름이다.
+- 포트 패키지는 기능별로 나누고 adapter 하위 패키지와 1:1로 대응시킨다. outbound adapter 패키지는 `adapter/outbound/<포트 패키지 이름>/`이다. 같은 기술의 어댑터가 포트 둘 이상을 구현할 때만 `adapter/outbound/<기술 이름>/<포트 패키지 이름>/`으로 둔다. 예: `sender/`, `persistence/{notification,outbox,dlt}/`.
 - 상태 전이가 있는 aggregate는 불변이고(`val`과 `markX(): T`), 외부 side effect 뒤의 결과 확정은 CAS로 한다. 전이 전 값을 별도 변수에 복사해 두는 코드는 거부한다(ADR 024).
 - 어댑터는 실패를 분류만 하고 직접 재시도하지 않는다. 재시도 여부는 저장된 상태를 읽어 결정한다(개발가이드 어댑터 관례).
 - 시간은 application이 `Clock`으로 만들어 전달한다. 도메인의 `Instant.now()`는 거부한다.
