@@ -16,11 +16,11 @@ import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryAssemblyPer
 import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryMongoDocument
 import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryPersistenceAdapter
 import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryReorganizePersistenceAdapter
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCandidateIndexAdapter
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCollection
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateHit
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateQuery
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCandidateIndexAdapter
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCollection
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateHit
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateQuery
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.application.service.cleanup.CleanupCandidateIndexService
 import me.rgunny.kachi.story.application.service.close.CloseIdleStoriesService
 import me.rgunny.kachi.story.application.service.close.StoryClosePolicy

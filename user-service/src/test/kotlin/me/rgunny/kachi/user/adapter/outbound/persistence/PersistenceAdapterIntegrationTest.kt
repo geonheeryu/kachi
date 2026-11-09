@@ -1,7 +1,7 @@
 package me.rgunny.kachi.user.adapter.outbound.persistence
 
 import jakarta.persistence.EntityManager
-import me.rgunny.kachi.user.adapter.outbound.crypto.AesGcmAddressCipher
+import me.rgunny.kachi.user.adapter.outbound.binding.AesGcmAddressCipher
 import me.rgunny.kachi.user.adapter.outbound.persistence.binding.ChannelBindingPersistenceAdapter
 import me.rgunny.kachi.user.adapter.outbound.persistence.keyword.KeywordPersistenceAdapter
 import me.rgunny.kachi.user.adapter.outbound.persistence.subscription.SubscriptionPersistenceAdapter

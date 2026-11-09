@@ -1,6 +1,6 @@
 package me.rgunny.kachi.ai.config
 
-import me.rgunny.kachi.ai.adapter.outbound.messaging.KafkaAiOutboxPublisher
+import me.rgunny.kachi.ai.adapter.outbound.outbox.KafkaAiOutboxPublisher
 import me.rgunny.kachi.ai.application.port.outbound.outbox.AiOutboxPublisherPort
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxEventType
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty

@@ -3,8 +3,8 @@ package me.rgunny.kachi.collector.config
 import io.netty.channel.ChannelOption
 import io.netty.handler.timeout.ReadTimeoutHandler
 import io.netty.handler.timeout.WriteTimeoutHandler
-import me.rgunny.kachi.collector.adapter.outbound.client.naver.NaverNewsSearchProvider
-import me.rgunny.kachi.collector.adapter.outbound.client.naver.NaverNewsSettings
+import me.rgunny.kachi.collector.adapter.outbound.news.naver.NaverNewsSearchProvider
+import me.rgunny.kachi.collector.adapter.outbound.news.naver.NaverNewsSettings
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties

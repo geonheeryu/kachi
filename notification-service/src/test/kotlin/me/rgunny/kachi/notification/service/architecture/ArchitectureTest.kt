@@ -51,6 +51,21 @@ class ArchitectureTest {
 
         @ArchTest
         @JvmField
+        val outbound_adapter_packages_are_named_after_ports: ArchRule = classes()
+            .that().resideInAPackage("..service.adapter.outbound..")
+            .should().resideInAnyPackage(
+                "..service.adapter.outbound.dlt..",
+                "..service.adapter.outbound.idempotency..",
+                "..service.adapter.outbound.notification..",
+                "..service.adapter.outbound.outbox..",
+                "..service.adapter.outbound.recipient..",
+                "..service.adapter.outbound.sender..",
+                "..service.adapter.outbound.persistence..",
+            )
+            .because("adapter/outbound 1단은 그 어댑터가 구현하는 포트 패키지의 이름이다. 포트가 다른 어댑터들이 같은 구현 클래스를 함께 쓸 때만 기술 이름을 쓴다 (docs/패키지구조.md)")
+
+        @ArchTest
+        @JvmField
         val no_package_cycles: ArchRule = slices()
             .matching("me.rgunny.kachi.notification.service.(*)..")
             .should().beFreeOfCycles()

@@ -1,6 +1,6 @@
 package me.rgunny.kachi.notification.fake
 
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationDispatchPublisher
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationDispatchPublisher
 import me.rgunny.kachi.notification.domain.NotificationOutbox
 
 class FakeDispatchPublisher(

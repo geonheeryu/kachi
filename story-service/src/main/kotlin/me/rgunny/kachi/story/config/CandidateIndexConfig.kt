@@ -3,10 +3,10 @@ package me.rgunny.kachi.story.config
 import io.qdrant.client.QdrantClient
 import io.qdrant.client.QdrantGrpcClient
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.story.adapter.outbound.qdrant.QdrantHealthIndicator
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCandidateIndexAdapter
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCollection
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantHealthIndicator
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCandidateIndexAdapter
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCollection
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.context.properties.EnableConfigurationProperties

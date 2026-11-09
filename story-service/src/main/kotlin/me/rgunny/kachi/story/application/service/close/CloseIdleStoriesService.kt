@@ -4,7 +4,7 @@ import java.time.Clock
 import java.time.Instant
 import me.rgunny.kachi.story.application.port.inbound.close.CloseIdleStoriesUseCase
 import me.rgunny.kachi.story.application.port.inbound.close.model.CloseIdleStoriesResult
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
 import me.rgunny.kachi.story.application.port.outbound.story.StoryPersistencePort
 import me.rgunny.kachi.story.domain.Story
 import org.slf4j.LoggerFactory

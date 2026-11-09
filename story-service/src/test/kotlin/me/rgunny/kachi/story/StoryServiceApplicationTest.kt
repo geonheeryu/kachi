@@ -6,13 +6,13 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.story.adapter.outbound.outbox.JacksonStoryOutboxEventSerializer
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCandidateIndexAdapter
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCollection
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCandidateIndexAdapter
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCollection
 import me.rgunny.kachi.story.adapter.outbound.tei.TeiHttpClient
 import me.rgunny.kachi.story.adapter.outbound.tei.judge.TeiRerankJudge
 import me.rgunny.kachi.story.application.port.inbound.assembly.AssembleStoryUseCase
 import me.rgunny.kachi.story.application.port.outbound.embedding.EmbeddingPort
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
 import me.rgunny.kachi.story.application.port.outbound.judge.StoryLinkJudge
 import me.rgunny.kachi.story.application.port.outbound.outbox.StoryOutboxEventSerializer
 import me.rgunny.kachi.story.application.service.assembly.AssembleStoryService

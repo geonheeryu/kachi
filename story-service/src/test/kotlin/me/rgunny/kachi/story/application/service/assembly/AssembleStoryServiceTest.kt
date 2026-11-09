@@ -13,8 +13,8 @@ import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.story.application.exception.StoryAssemblyErrorCode
 import me.rgunny.kachi.story.application.exception.StoryAssemblyException
 import me.rgunny.kachi.story.application.port.inbound.assembly.model.AttachArticleCommand
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.application.port.outbound.story.model.AttachOutcome
 import me.rgunny.kachi.story.domain.AutoMergedLinkDecision
 import me.rgunny.kachi.story.domain.Embedding

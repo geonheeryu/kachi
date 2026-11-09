@@ -4,7 +4,7 @@ import java.time.Duration
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.domain.NewsId
 import me.rgunny.kachi.story.fake.InMemoryCandidateIndexPort
 import me.rgunny.kachi.story.fixture.StoryTestFixture

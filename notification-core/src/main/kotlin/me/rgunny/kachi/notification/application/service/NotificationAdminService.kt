@@ -11,8 +11,8 @@ import me.rgunny.kachi.notification.application.port.inbound.admin.model.Notific
 import me.rgunny.kachi.notification.application.port.inbound.admin.model.NotificationSummary
 import me.rgunny.kachi.notification.application.port.inbound.admin.model.RecoverDeadNotificationCommand
 import me.rgunny.kachi.notification.application.port.inbound.admin.model.RecoverDeadNotificationResult
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationEventSerializer
-import me.rgunny.kachi.notification.application.port.outbound.messaging.model.NotificationDispatchMessage
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationEventSerializer
+import me.rgunny.kachi.notification.application.port.outbound.outbox.model.NotificationDispatchMessage
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationAdminPersistencePort
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationPersistencePort
 import me.rgunny.kachi.notification.domain.Notification

@@ -1,6 +1,6 @@
 package me.rgunny.kachi.collector.config
 
-import me.rgunny.kachi.collector.adapter.outbound.messaging.KafkaCollectorOutboxPublisher
+import me.rgunny.kachi.collector.adapter.outbound.outbox.KafkaCollectorOutboxPublisher
 import me.rgunny.kachi.collector.application.port.outbound.outbox.CollectorOutboxPublisherPort
 import me.rgunny.kachi.collector.domain.outbox.CollectorOutboxEventType
 import org.apache.kafka.clients.admin.NewTopic

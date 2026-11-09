@@ -8,10 +8,10 @@ import me.rgunny.kachi.story.application.port.inbound.assembly.AssembleStoryUseC
 import me.rgunny.kachi.story.application.port.inbound.assembly.model.AssembleStoryResult
 import me.rgunny.kachi.story.application.port.inbound.assembly.model.AttachArticleCommand
 import me.rgunny.kachi.story.application.port.outbound.embedding.EmbeddingPort
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateHit
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateQuery
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateHit
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateQuery
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.application.port.outbound.judge.StoryLinkJudge
 import me.rgunny.kachi.story.application.port.outbound.judge.model.JudgeCandidate
 import me.rgunny.kachi.story.application.port.outbound.outbox.StoryOutboxEventSerializer
