@@ -49,6 +49,21 @@ class KeywordPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTe
         }
 
         @Test
+        @DisplayName("canonicalKey 여럿 중 존재하는 키워드만 찾는다")
+        fun findAllByCanonicalKeys() {
+            val nvidia = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("NVIDIA"), now))
+            val tsmc = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("TSMC"), now))
+            keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("Tesla"), now))
+            flushAndClear()
+
+            val found = keywordPersistenceAdapter.findAllByCanonicalKeys(
+                setOf(CanonicalKey.of("nvidia"), CanonicalKey.of("tsmc"), CanonicalKey.of("apple"))
+            )
+
+            assertEquals(setOf(nvidia.id, tsmc.id), found.map { it.id }.toSet())
+        }
+
+        @Test
         @DisplayName("같은 canonicalKey는 두 번 저장할 수 없다")
         fun rejectDuplicateCanonicalKey() {
             keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("Tesla"), now))

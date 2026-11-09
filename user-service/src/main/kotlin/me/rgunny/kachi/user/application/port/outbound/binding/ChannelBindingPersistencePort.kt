@@ -1,5 +1,6 @@
 package me.rgunny.kachi.user.application.port.outbound.binding
 
+import me.rgunny.kachi.user.application.port.outbound.binding.model.ActiveChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBindingId
 import me.rgunny.kachi.user.domain.LinkTokenHash
@@ -19,6 +20,13 @@ interface ChannelBindingPersistencePort {
     fun findAllByUserId(userId: UserId): List<ChannelBinding>
 
     fun findAllByUserIds(userIds: Set<UserId>): List<ChannelBinding>
+
+    /**
+     * [userIds]의 ACTIVE 바인딩 `(userId, channel)`.
+     *
+     * 주소를 읽지도 복호화하지도 않는다. 순서는 정하지 않는다.
+     */
+    fun findAllActiveByUserIds(userIds: Set<UserId>): List<ActiveChannelBinding>
 
     fun findByLinkTokenHash(linkTokenHash: LinkTokenHash): ChannelBinding?
 

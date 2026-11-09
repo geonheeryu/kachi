@@ -2,8 +2,10 @@ package me.rgunny.kachi.user.adapter.outbound.persistence.binding
 
 import me.rgunny.kachi.user.application.port.outbound.binding.AddressCipherPort
 import me.rgunny.kachi.user.application.port.outbound.binding.ChannelBindingPersistencePort
+import me.rgunny.kachi.user.application.port.outbound.binding.model.ActiveChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBindingId
+import me.rgunny.kachi.user.domain.ChannelBindingStatus
 import me.rgunny.kachi.user.domain.LinkTokenHash
 import me.rgunny.kachi.user.domain.SubscriptionChannel
 import me.rgunny.kachi.user.domain.UserId
@@ -39,6 +41,15 @@ class ChannelBindingPersistenceAdapter(
 
         return channelBindingJpaRepository.findAllByUserIdIn(userIds.map { it.value })
             .map { it.toDomain(addressCipherPort) }
+    }
+
+    override fun findAllActiveByUserIds(userIds: Set<UserId>): List<ActiveChannelBinding> {
+        if (userIds.isEmpty()) return emptyList()
+
+        return channelBindingJpaRepository.findChannelsByUserIdInAndStatus(
+            userIds = userIds.map { it.value },
+            status = ChannelBindingStatus.ACTIVE
+        ).map { ActiveChannelBinding(userId = UserId.of(it.userId), channel = it.channel) }
     }
 
     override fun findByLinkTokenHash(linkTokenHash: LinkTokenHash): ChannelBinding? {

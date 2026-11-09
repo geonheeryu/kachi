@@ -33,6 +33,15 @@ class KeywordPersistenceAdapter(
         return keywordJpaRepository.findByCanonicalKey(canonicalKey.value)?.toDomain()
     }
 
+    override fun findAllByCanonicalKeys(canonicalKeys: Set<CanonicalKey>): List<Keyword> {
+        if (canonicalKeys.isEmpty()) {
+            return emptyList()
+        }
+
+        return keywordJpaRepository.findAllByCanonicalKeyIn(canonicalKeys.map { it.value })
+            .map { it.toDomain() }
+    }
+
     override fun findAllWithEnabledSubscription(): List<Keyword> {
         return keywordJpaRepository.findAllWithEnabledSubscription()
             .map { it.toDomain() }

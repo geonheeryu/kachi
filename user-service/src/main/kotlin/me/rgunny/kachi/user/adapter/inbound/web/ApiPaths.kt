@@ -17,6 +17,7 @@ object ApiPaths {
     const val ME_CHANNEL_BINDING = "/me/channel-bindings/{channel}"
     const val INTERNAL_ACTIVE_KEYWORDS = "/internal/keywords/active"
     const val INTERNAL_SUBSCRIPTIONS = "/internal/subscriptions"
+    const val INTERNAL_SUBSCRIPTION_RECIPIENTS_SEARCH = "/internal/subscriptions/recipients/search"
     const val INTERNAL_USERS = "/internal/users"
     const val INTERNAL_CHANNEL_BINDING = "/internal/users/{userId}/channel-bindings/{channel}"
     const val INTERNAL_TELEGRAM_LINK = "/internal/channel-bindings/telegram/link"
@@ -32,6 +33,8 @@ object ApiPaths {
     const val V1_ME_CHANNEL_BINDING = "${ApiVersions.V1_PATH_PREFIX}$ME_CHANNEL_BINDING"
     const val V1_INTERNAL_ACTIVE_KEYWORDS = "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_ACTIVE_KEYWORDS"
     const val V1_INTERNAL_SUBSCRIPTIONS = "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_SUBSCRIPTIONS"
+    const val V1_INTERNAL_SUBSCRIPTION_RECIPIENTS_SEARCH =
+        "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_SUBSCRIPTION_RECIPIENTS_SEARCH"
     const val V1_INTERNAL_USERS = "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_USERS"
     const val V1_INTERNAL_CHANNEL_BINDING = "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_CHANNEL_BINDING"
     const val V1_INTERNAL_TELEGRAM_LINK = "${ApiVersions.V1_PATH_PREFIX}$INTERNAL_TELEGRAM_LINK"

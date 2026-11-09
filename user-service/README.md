@@ -16,7 +16,7 @@ notification-routing과 notification-worker는 같은 internal API로 키워드�
 - 사용자 등록, 내 정보 조회, 탈퇴 API
 - 내 키워드 구독 등록, 조회, 수정 API
 - 내 채널 바인딩 등록(Slack·Discord webhook, Telegram 연결 링크), 조회, 해지 API
-- 활성 키워드, 키워드·역할별 수신자, 수신 주소, Telegram 연결 internal API
+- 활성 키워드, 키워드·역할별 수신자, 구독 수신자 페이지, 수신 주소, Telegram 연결 internal API
 - Spring Security 기반 JWT 인증 필터
 - Actuator health endpoint
 
@@ -227,6 +227,47 @@ GET /api/v1/internal/subscriptions?keyword=space-x
 `keyword`는 다시 정규화해 찾으므로 활성 키워드 API의 `name`을 그대로 보내면 되고 원문이 와도 같은 결과다.
 enabled 구독의 채널 중 바인딩이 `ACTIVE`인 것만 `userId`, `channel` 순으로 돌려주고, 없는 키워드는 빈 배열이다.
 `userId`가 수신자 식별자(recipientId)이며 주소는 싣지 않는다. `(userId, channel)`이 바인딩 하나를 확정한다.
+
+구독 수신자 조회. 여러 키워드의 수신자를 사용자 단위 페이지로 돌려준다:
+
+```http
+POST /api/v1/internal/subscriptions/recipients/search
+```
+
+```json
+{ "keywords": ["nvidia", "tsmc"], "cursor": null, "limit": 100 }
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "keywords": [{ "canonicalKey": "nvidia", "displayName": "NVIDIA" }],
+    "recipients": [{ "userId": "…", "channel": "SLACK", "keywordIndexes": [0] }],
+    "nextCursor": "…"
+  },
+  "error": null
+}
+```
+
+요청 키워드는 정규화한 뒤 중복을 없애고, 존재하는 키워드만 `canonicalKey` 오름차순으로 `keywords`에 담는다.
+없는 키워드만 주면 `keywords`·`recipients`가 빈 배열이고 `nextCursor`는 `null`이다.
+
+수신자 항목은 `(userId, channel)` 하나이고 `userId`, `channel` 순으로 담는다.
+enabled 구독의 채널 중 그 사용자의 `ACTIVE` 바인딩이 있는 채널만 항목이 된다.
+`keywordIndexes`는 그 채널로 구독한 키워드의 `keywords` 배열 위치를 오름차순으로 가리킨다.
+
+`limit`은 사용자 수이고 한 사용자의 항목은 모두 한 페이지에 들어간다.
+`cursor`에는 앞 페이지의 `nextCursor`를 보내고, `nextCursor`가 `null`이면 마지막 페이지다.
+페이지의 사용자가 모두 `ACTIVE` 바인딩이 없으면 `recipients`가 비어 있어도 `nextCursor`가 있다.
+`userId` 순서는 UUID 16바이트의 부호 없는 바이트 순이다.
+
+다음 요청은 `400 INVALID_REQUEST`다.
+
+- `keywords`가 0개이거나 100개를 넘거나 null·blank 원소가 있다.
+- `limit`이 1~100을 벗어난다. 생략하면 100이다.
+- `cursor`가 UUID 형식이 아니다.
+- 정규화하면 빈 값이 되거나 100자를 넘는 키워드가 있다.
 
 역할별 수신자 조회 — notification-routing이 키워드 격리 이벤트의 수신자를 물을 때 호출한다:
 

@@ -8,6 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import me.rgunny.kachi.user.adapter.outbound.persistence.PersistenceAdapterIntegrationTest
+import me.rgunny.kachi.user.application.port.outbound.binding.model.ActiveChannelBinding
 import me.rgunny.kachi.user.domain.ChannelAddress
 import me.rgunny.kachi.user.domain.ChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBindingStatus
@@ -140,6 +141,41 @@ class ChannelBindingPersistenceAdapterIntegrationTest : PersistenceAdapterIntegr
             assertEquals(setOf(alice to SubscriptionChannel.SLACK, bob to SubscriptionChannel.TELEGRAM), bindings.map { it.userId to it.channel }.toSet())
             assertEquals(address(SubscriptionChannel.TELEGRAM), bindings.single { it.userId == bob }.address)
             assertEquals(emptyList(), channelBindingPersistenceAdapter.findAllByUserIds(emptySet()))
+        }
+
+        @Test
+        @DisplayName("여러 사용자의 ACTIVE 바인딩만 (userId, channel)으로 조회한다")
+        fun findAllActiveByUserIds() {
+            val alice = UserId.newId()
+            val bob = UserId.newId()
+            channelBindingPersistenceAdapter.save(activeBinding(alice, SubscriptionChannel.SLACK))
+            channelBindingPersistenceAdapter.save(activeBinding(alice, SubscriptionChannel.DISCORD).revoke(now))
+            channelBindingPersistenceAdapter.save(
+                ChannelBinding.createPending(alice, SubscriptionChannel.TELEGRAM, LinkToken.issue(now, Duration.ofMinutes(10)), now)
+            )
+            channelBindingPersistenceAdapter.save(activeBinding(bob, SubscriptionChannel.TELEGRAM))
+            channelBindingPersistenceAdapter.save(activeBinding(UserId.newId(), SubscriptionChannel.SLACK))
+            flushAndClear()
+
+            val bindings = channelBindingPersistenceAdapter.findAllActiveByUserIds(setOf(alice, bob))
+
+            assertEquals(
+                setOf(
+                    ActiveChannelBinding(alice, SubscriptionChannel.SLACK),
+                    ActiveChannelBinding(bob, SubscriptionChannel.TELEGRAM)
+                ),
+                bindings.toSet()
+            )
+            assertEquals(2, bindings.size)
+        }
+
+        @Test
+        @DisplayName("빈 사용자 집합이면 빈 목록이다")
+        fun findAllActiveByEmptyUserIds() {
+            channelBindingPersistenceAdapter.save(activeBinding(UserId.newId(), SubscriptionChannel.SLACK))
+            flushAndClear()
+
+            assertEquals(emptyList(), channelBindingPersistenceAdapter.findAllActiveByUserIds(emptySet()))
         }
     }
 }

@@ -27,6 +27,9 @@ class FakeKeywordPersistencePort(
     override fun findByCanonicalKey(canonicalKey: CanonicalKey): Keyword? =
         keywords.values.firstOrNull { it.canonicalKey == canonicalKey }
 
+    override fun findAllByCanonicalKeys(canonicalKeys: Set<CanonicalKey>): List<Keyword> =
+        keywords.values.filter { it.canonicalKey in canonicalKeys }
+
     override fun findAllWithEnabledSubscription(): List<Keyword> =
         keywords.values.filter { it.id in keywordIdsWithEnabledSubscription }
 
