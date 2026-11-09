@@ -3,35 +3,55 @@ package me.rgunny.kachi.notification.routing.adapter.outbound.recipient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import me.rgunny.kachi.notification.contract.NotificationChannel
+import me.rgunny.kachi.notification.routing.adapter.outbound.recipient.dto.UserServiceApiResponse
+import me.rgunny.kachi.notification.routing.adapter.outbound.recipient.dto.UserServiceRecipientPageResponse
+import me.rgunny.kachi.notification.routing.adapter.outbound.recipient.dto.UserServiceRecipientResponse
+import me.rgunny.kachi.notification.routing.adapter.outbound.recipient.dto.UserServiceRecipientSearchRequest
+import me.rgunny.kachi.notification.routing.adapter.outbound.recipient.dto.UserServiceUserChannelsResponse
 import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.RecipientReaderPort
 import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.Recipient
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.RecipientPage
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedKeyword
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedRecipient
 import me.rgunny.kachi.notification.routing.exception.routing.RecipientReaderException
 import me.rgunny.kachi.notification.routing.exception.routing.RoutingErrorCode
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.util.UriBuilder
 
 /**
- * user-service 수신자 조회 internal API 클라이언트. 구독자는 키워드로, 관리자는 역할로 묻는다.
+ * user-service 수신자 조회 internal API 클라이언트. 구독자는 키워드 페이지로, 관리자는 역할로 묻는다.
  *
  * 재시도와 서킷 브레이커는 두지 않는다. 실패는 RecipientReaderException으로 나가고 재시도는 호출자(Kafka consumer)가 한다.
+ * 구독자 응답의 범위 밖 keywordIndexes, 빈 keywordIndexes, 모르는 채널은 USER_SERVICE_RESPONSE_INVALID다.
  */
 class UserServiceRecipientReaderAdapter(
     private val webClient: WebClient,
     private val settings: UserServiceRecipientReaderSettings,
 ) : RecipientReaderPort {
 
-    override suspend fun findSubscribers(keyword: String): List<Recipient> {
-        val subscribers = fetch(SUBSCRIBERS_RESPONSE_TYPE, "keyword=$keyword") { builder ->
-            builder.path(settings.subscriptionsPath).queryParam("keyword", keyword)
+    override suspend fun findSubscribers(keywords: Set<String>, cursor: String?): RecipientPage {
+        require(keywords.isNotEmpty()) { "keywords must not be empty" }
+        val detail = "keywordCount=${keywords.size}, cursor=$cursor"
+
+        val page = fetch(RECIPIENT_PAGE_RESPONSE_TYPE, detail) { client ->
+            client.post()
+                .uri { builder -> builder.path(settings.recipientsSearchPath).build() }
+                .bodyValue(
+                    UserServiceRecipientSearchRequest(
+                        keywords = keywords.toList(),
+                        cursor = cursor,
+                        limit = settings.pageSize,
+                    )
+                )
         }
 
-        return subscribers.map { Recipient(recipientId = it.userId, channel = toChannel(it.channel)) }
+        return toRecipientPage(page, detail)
     }
 
     override suspend fun findAdmins(): List<Recipient> {
-        val users = fetch(USER_CHANNELS_RESPONSE_TYPE, "role=$ADMIN_ROLE") { builder ->
-            builder.path(settings.usersPath).queryParam("role", ADMIN_ROLE)
+        val users = fetch(USER_CHANNELS_RESPONSE_TYPE, "role=$ADMIN_ROLE") { client ->
+            client.get()
+                .uri { builder -> builder.path(settings.usersPath).queryParam("role", ADMIN_ROLE).build() }
         }
 
         return users.flatMap { user ->
@@ -40,13 +60,12 @@ class UserServiceRecipientReaderAdapter(
     }
 
     private suspend fun <T> fetch(
-        responseType: ParameterizedTypeReference<UserServiceApiResponse<List<T>>>,
+        responseType: ParameterizedTypeReference<UserServiceApiResponse<T>>,
         detail: String,
-        uri: (UriBuilder) -> UriBuilder,
-    ): List<T> {
+        request: (WebClient) -> WebClient.RequestHeadersSpec<*>,
+    ): T {
         val response = try {
-            webClient.get()
-                .uri { builder -> uri(builder).build() }
+            request(webClient)
                 .retrieve()
                 .onStatus({ it.isError }) { response ->
                     response.bodyToMono(String::class.java)
@@ -81,6 +100,45 @@ class UserServiceRecipientReaderAdapter(
             ?: throw RecipientReaderException(RoutingErrorCode.USER_SERVICE_RESPONSE_MISSING_DATA, detail)
     }
 
+    private fun toRecipientPage(page: UserServiceRecipientPageResponse, detail: String): RecipientPage {
+        return try {
+            val keywords = page.keywords.map { SubscribedKeyword(canonicalKey = it.canonicalKey, displayName = it.displayName) }
+            RecipientPage(
+                recipients = page.recipients.map { recipient -> toSubscribedRecipient(recipient, keywords) },
+                nextCursor = page.nextCursor,
+            )
+        } catch (exception: IllegalArgumentException) {
+            throw RecipientReaderException(
+                errorCode = RoutingErrorCode.USER_SERVICE_RESPONSE_INVALID,
+                detail = "$detail, ${exception.message}",
+                cause = exception,
+            )
+        }
+    }
+
+    private fun toSubscribedRecipient(
+        recipient: UserServiceRecipientResponse,
+        keywords: List<SubscribedKeyword>,
+    ): SubscribedRecipient {
+        if (recipient.keywordIndexes.isEmpty()) {
+            throw RecipientReaderException(
+                errorCode = RoutingErrorCode.USER_SERVICE_RESPONSE_INVALID,
+                detail = "empty keywordIndexes. recipientId=${recipient.userId}, channel=${recipient.channel}",
+            )
+        }
+
+        return SubscribedRecipient(
+            recipientId = recipient.userId,
+            channel = toChannel(recipient.channel),
+            keywords = recipient.keywordIndexes.map { index ->
+                keywords.getOrNull(index) ?: throw RecipientReaderException(
+                    errorCode = RoutingErrorCode.USER_SERVICE_RESPONSE_INVALID,
+                    detail = "keywordIndex out of range. recipientId=${recipient.userId}, index=$index, keywordCount=${keywords.size}",
+                )
+            },
+        )
+    }
+
     private fun toChannel(channel: String): NotificationChannel {
         return when (channel) {
             "SLACK" -> NotificationChannel.SLACK
@@ -97,8 +155,8 @@ class UserServiceRecipientReaderAdapter(
         const val MAX_ERROR_BODY_LENGTH = 500
         const val ADMIN_ROLE = "ADMIN"
 
-        val SUBSCRIBERS_RESPONSE_TYPE =
-            object : ParameterizedTypeReference<UserServiceApiResponse<List<UserServiceSubscriberResponse>>>() {}
+        val RECIPIENT_PAGE_RESPONSE_TYPE =
+            object : ParameterizedTypeReference<UserServiceApiResponse<UserServiceRecipientPageResponse>>() {}
         val USER_CHANNELS_RESPONSE_TYPE =
             object : ParameterizedTypeReference<UserServiceApiResponse<List<UserServiceUserChannelsResponse>>>() {}
     }

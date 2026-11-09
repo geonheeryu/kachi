@@ -43,7 +43,8 @@ kachi:
         backoff: 1s
       user-service:
         base-url: ${KACHI_USER_SERVICE_BASE_URL:}
-        subscriptions-path: /api/v1/internal/subscriptions
+        recipients-search-path: /api/v1/internal/subscriptions/recipients/search
+        page-size: 100
         users-path: /api/v1/internal/users
         timeout: 3s
         max-in-memory-size: 262144

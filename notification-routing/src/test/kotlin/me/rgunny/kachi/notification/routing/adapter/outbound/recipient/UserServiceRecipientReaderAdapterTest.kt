@@ -3,6 +3,9 @@ package me.rgunny.kachi.notification.routing.adapter.outbound.recipient
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.notification.contract.NotificationChannel
 import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.Recipient
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.RecipientPage
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedKeyword
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedRecipient
 import me.rgunny.kachi.notification.routing.exception.routing.RecipientReaderException
 import me.rgunny.kachi.notification.routing.exception.routing.RoutingErrorCode
 import me.rgunny.kachi.notification.routing.support.CapturingExchangeFunction
@@ -11,12 +14,15 @@ import me.rgunny.kachi.notification.routing.support.jsonExchangeFunction
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.web.reactive.function.client.ExchangeFunction
 import org.springframework.web.reactive.function.client.WebClient
 import java.time.Duration
+import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @DisplayName("UserServiceRecipientReaderAdapter")
@@ -25,11 +31,19 @@ class UserServiceRecipientReaderAdapterTest {
     private val subscribersJson = """
         {
           "success": true,
-          "data": [
-            { "userId": "user-1", "channel": "SLACK" },
-            { "userId": "user-1", "channel": "TELEGRAM" },
-            { "userId": "user-2", "channel": "DISCORD" }
-          ]
+          "data": {
+            "keywords": [
+              { "canonicalKey": "nvidia", "displayName": "NVIDIA" },
+              { "canonicalKey": "tsmc", "displayName": "TSMC" }
+            ],
+            "recipients": [
+              { "userId": "user-1", "channel": "SLACK", "keywordIndexes": [0, 1] },
+              { "userId": "user-1", "channel": "TELEGRAM", "keywordIndexes": [1] },
+              { "userId": "user-2", "channel": "DISCORD", "keywordIndexes": [0] }
+            ],
+            "nextCursor": "user-2"
+          },
+          "error": null
         }
     """.trimIndent()
 
@@ -48,46 +62,121 @@ class UserServiceRecipientReaderAdapterTest {
     inner class Subscribers {
 
         @Test
-        @DisplayName("구독 조회 경로에 keyword query로 호출한다")
-        fun requestPath() = runBlocking {
+        @DisplayName("수신자 조회 경로로 keywords, cursor, 설정의 page-size를 POST body에 실어 호출한다")
+        fun requestBody() = runBlocking {
             val exchange = CapturingExchangeFunction(subscribersJson)
 
-            adapterOf(exchange).findSubscribers("space x")
+            adapterOf(exchange, pageSize = 50).findSubscribers(linkedSetOf("nvidia", "tsmc"), "user-0")
 
-            assertEquals(RoutingTestFixture.SUBSCRIPTIONS_PATH, exchange.request.url().path)
-            assertEquals("keyword=space%20x", exchange.request.url().rawQuery)
-        }
-
-        @Test
-        @DisplayName("응답을 Recipient로 옮기고 채널을 계약 채널로 짝짓는다")
-        fun mapSubscribers() = runBlocking {
-            val recipients = adapterOf(jsonExchangeFunction(subscribersJson)).findSubscribers("tesla")
-
+            assertEquals(HttpMethod.POST, exchange.request.method())
+            assertEquals(RoutingTestFixture.RECIPIENTS_SEARCH_PATH, exchange.request.url().path)
+            assertNull(exchange.request.url().rawQuery)
             assertEquals(
-                listOf(
-                    Recipient("user-1", NotificationChannel.SLACK),
-                    Recipient("user-1", NotificationChannel.TELEGRAM),
-                    Recipient("user-2", NotificationChannel.DISCORD),
-                ),
-                recipients,
+                JsonMapper.builder().build().readTree("""{ "keywords": ["nvidia", "tsmc"], "cursor": "user-0", "limit": 50 }"""),
+                exchange.sentBody,
             )
         }
 
         @Test
-        @DisplayName("빈 목록은 빈 리스트다")
-        fun emptyList() = runBlocking {
-            val recipients = adapterOf(jsonExchangeFunction("""{ "success": true, "data": [] }""")).findSubscribers("nobody")
+        @DisplayName("첫 페이지는 cursor를 null로 보낸다")
+        fun firstPageCursor() = runBlocking {
+            val exchange = CapturingExchangeFunction(subscribersJson)
 
-            assertTrue(recipients.isEmpty())
+            adapterOf(exchange).findSubscribers(setOf("nvidia"), null)
+
+            val body = exchange.sentBody
+            assertTrue(body.get("cursor").isNull)
+            assertEquals(100, body.get("limit").asInt())
+        }
+
+        @Test
+        @DisplayName("keywordIndexes를 응답 keywords로 풀고 채널을 계약 채널로 짝지으며 nextCursor를 전달한다")
+        fun mapPage() = runBlocking {
+            val page = adapterOf(jsonExchangeFunction(subscribersJson)).findSubscribers(setOf("nvidia", "tsmc"), null)
+
+            val nvidia = SubscribedKeyword("nvidia", "NVIDIA")
+            val tsmc = SubscribedKeyword("tsmc", "TSMC")
+            assertEquals(
+                RecipientPage(
+                    recipients = listOf(
+                        SubscribedRecipient("user-1", NotificationChannel.SLACK, listOf(nvidia, tsmc)),
+                        SubscribedRecipient("user-1", NotificationChannel.TELEGRAM, listOf(tsmc)),
+                        SubscribedRecipient("user-2", NotificationChannel.DISCORD, listOf(nvidia)),
+                    ),
+                    nextCursor = "user-2",
+                ),
+                page,
+            )
+        }
+
+        @Test
+        @DisplayName("수신자가 0명이어도 nextCursor를 전달한다")
+        fun emptyPageWithNextCursor() = runBlocking {
+            val body = pageJson(keywords = """[]""", recipients = """[]""", nextCursor = "\"user-9\"")
+
+            val page = adapterOf(jsonExchangeFunction(body)).findSubscribers(setOf("nobody"), null)
+
+            assertTrue(page.recipients.isEmpty())
+            assertEquals("user-9", page.nextCursor)
+        }
+
+        @Test
+        @DisplayName("마지막 페이지의 nextCursor는 null이다")
+        fun lastPage() = runBlocking {
+            val body = pageJson(keywords = """[]""", recipients = """[]""", nextCursor = "null")
+
+            val page = adapterOf(jsonExchangeFunction(body)).findSubscribers(setOf("nobody"), "user-9")
+
+            assertTrue(page.recipients.isEmpty())
+            assertNull(page.nextCursor)
+        }
+
+        @Test
+        @DisplayName("범위 밖 keywordIndexes는 USER_SERVICE_RESPONSE_INVALID다")
+        fun rejectOutOfRangeIndex() = runBlocking {
+            val body = pageJson(recipients = """[{ "userId": "user-1", "channel": "SLACK", "keywordIndexes": [1] }]""")
+
+            assertResponseInvalid(body)
+        }
+
+        @Test
+        @DisplayName("음수 keywordIndexes는 USER_SERVICE_RESPONSE_INVALID다")
+        fun rejectNegativeIndex() = runBlocking {
+            val body = pageJson(recipients = """[{ "userId": "user-1", "channel": "SLACK", "keywordIndexes": [-1] }]""")
+
+            assertResponseInvalid(body)
+        }
+
+        @Test
+        @DisplayName("빈 keywordIndexes는 USER_SERVICE_RESPONSE_INVALID다")
+        fun rejectEmptyIndexes() = runBlocking {
+            val body = pageJson(recipients = """[{ "userId": "user-1", "channel": "SLACK", "keywordIndexes": [] }]""")
+
+            assertResponseInvalid(body)
         }
 
         @Test
         @DisplayName("모르는 채널은 USER_SERVICE_RESPONSE_INVALID다")
         fun rejectUnknownChannel() = runBlocking {
-            val body = """{ "success": true, "data": [ { "userId": "user-1", "channel": "PIGEON" } ] }"""
+            val body = pageJson(recipients = """[{ "userId": "user-1", "channel": "PIGEON", "keywordIndexes": [0] }]""")
 
+            assertResponseInvalid(body)
+        }
+
+        @Test
+        @DisplayName("canonicalKey 오름차순이 아닌 keywordIndexes는 USER_SERVICE_RESPONSE_INVALID다")
+        fun rejectUnorderedIndexes() = runBlocking {
+            val body = pageJson(
+                keywords = """[{ "canonicalKey": "nvidia", "displayName": "NVIDIA" }, { "canonicalKey": "tsmc", "displayName": "TSMC" }]""",
+                recipients = """[{ "userId": "user-1", "channel": "SLACK", "keywordIndexes": [1, 0] }]""",
+            )
+
+            assertResponseInvalid(body)
+        }
+
+        private suspend fun assertResponseInvalid(body: String) {
             val exception = assertFailsWith<RecipientReaderException> {
-                adapterOf(jsonExchangeFunction(body)).findSubscribers("tesla")
+                adapterOf(jsonExchangeFunction(body)).findSubscribers(setOf("nvidia"), null)
             }
 
             assertEquals(RoutingErrorCode.USER_SERVICE_RESPONSE_INVALID, exception.errorCode)
@@ -153,7 +242,7 @@ class UserServiceRecipientReaderAdapterTest {
         @DisplayName("비-2xx 응답은 USER_SERVICE_REQUEST_FAILED다")
         fun rejectErrorStatus() = runBlocking {
             val exception = assertFailsWith<RecipientReaderException> {
-                adapterOf(jsonExchangeFunction("""{ "success": false }""", HttpStatus.SERVICE_UNAVAILABLE)).findSubscribers("tesla")
+                adapterOf(jsonExchangeFunction("""{ "success": false }""", HttpStatus.SERVICE_UNAVAILABLE)).findSubscribers(setOf("tesla"), null)
             }
 
             assertEquals(RoutingErrorCode.USER_SERVICE_REQUEST_FAILED, exception.errorCode)
@@ -174,7 +263,7 @@ class UserServiceRecipientReaderAdapterTest {
         @DisplayName("data가 없으면 USER_SERVICE_RESPONSE_MISSING_DATA다")
         fun rejectMissingData() = runBlocking {
             val exception = assertFailsWith<RecipientReaderException> {
-                adapterOf(jsonExchangeFunction("""{ "success": true }""")).findSubscribers("tesla")
+                adapterOf(jsonExchangeFunction("""{ "success": true }""")).findSubscribers(setOf("tesla"), null)
             }
 
             assertEquals(RoutingErrorCode.USER_SERVICE_RESPONSE_MISSING_DATA, exception.errorCode)
@@ -188,7 +277,7 @@ class UserServiceRecipientReaderAdapterTest {
                 timeout = Duration.ofMillis(50),
             )
 
-            val exception = assertFailsWith<RecipientReaderException> { adapter.findSubscribers("tesla") }
+            val exception = assertFailsWith<RecipientReaderException> { adapter.findSubscribers(setOf("tesla"), null) }
 
             assertEquals(RoutingErrorCode.USER_SERVICE_REQUEST_FAILED, exception.errorCode)
         }
@@ -197,15 +286,25 @@ class UserServiceRecipientReaderAdapterTest {
     private fun adapterOf(
         exchange: ExchangeFunction,
         timeout: Duration = Duration.ofSeconds(3),
+        pageSize: Int = 100,
     ): UserServiceRecipientReaderAdapter {
-        val properties = RoutingTestFixture.properties(timeout = timeout).userService
+        val properties = RoutingTestFixture.properties(timeout = timeout, pageSize = pageSize).userService
         return UserServiceRecipientReaderAdapter(
             webClient = WebClient.builder().baseUrl(properties.baseUrl).exchangeFunction(exchange).build(),
             settings = UserServiceRecipientReaderSettings(
-                subscriptionsPath = properties.subscriptionsPath,
+                recipientsSearchPath = properties.recipientsSearchPath,
+                pageSize = properties.pageSize,
                 usersPath = properties.usersPath,
                 timeout = properties.timeout,
             ),
         )
+    }
+
+    private fun pageJson(
+        keywords: String = """[{ "canonicalKey": "nvidia", "displayName": "NVIDIA" }]""",
+        recipients: String,
+        nextCursor: String = "null",
+    ): String {
+        return """{ "success": true, "data": { "keywords": $keywords, "recipients": $recipients, "nextCursor": $nextCursor }, "error": null }"""
     }
 }

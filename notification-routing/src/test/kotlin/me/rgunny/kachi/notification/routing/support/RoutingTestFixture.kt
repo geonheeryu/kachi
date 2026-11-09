@@ -17,7 +17,7 @@ import java.time.ZoneOffset
 object RoutingTestFixture {
     val NOW: Instant = Instant.parse("2026-06-13T00:00:00Z")
     val CLOCK: Clock = Clock.fixed(NOW, ZoneOffset.UTC)
-    const val SUBSCRIPTIONS_PATH = "/api/v1/internal/subscriptions"
+    const val RECIPIENTS_SEARCH_PATH = "/api/v1/internal/subscriptions/recipients/search"
     const val USERS_PATH = "/api/v1/internal/users"
 
     fun properties(
@@ -30,7 +30,8 @@ object RoutingTestFixture {
         maxAttempts: Long = 3,
         backoff: Duration = Duration.ofSeconds(1),
         baseUrl: String = "http://localhost:8080",
-        subscriptionsPath: String = SUBSCRIPTIONS_PATH,
+        recipientsSearchPath: String = RECIPIENTS_SEARCH_PATH,
+        pageSize: Int = 100,
         usersPath: String = USERS_PATH,
         timeout: Duration = Duration.ofSeconds(3),
         maxInMemorySize: Int = 262144,
@@ -42,7 +43,7 @@ object RoutingTestFixture {
             topics = NotificationRoutingProperties.Topics(summaryCreatedTopic, keywordQuarantinedTopic),
             dlt = NotificationRoutingProperties.Dlt(dltTopic),
             retry = NotificationRoutingProperties.Retry(maxAttempts, backoff),
-            userService = NotificationRoutingProperties.UserService(baseUrl, subscriptionsPath, usersPath, timeout, maxInMemorySize),
+            userService = NotificationRoutingProperties.UserService(baseUrl, recipientsSearchPath, pageSize, usersPath, timeout, maxInMemorySize),
         )
     }
 

@@ -47,7 +47,8 @@ class NotificationRoutingConfig {
         return UserServiceRecipientReaderAdapter(
             webClient = userServiceWebClient,
             settings = UserServiceRecipientReaderSettings(
-                subscriptionsPath = properties.userService.subscriptionsPath,
+                recipientsSearchPath = properties.userService.recipientsSearchPath,
+                pageSize = properties.userService.pageSize,
                 usersPath = properties.userService.usersPath,
                 timeout = properties.userService.timeout,
             ),

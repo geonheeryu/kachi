@@ -34,7 +34,7 @@ class RouteNotificationService(
 
     override suspend fun routeSummary(command: RouteSummaryCommand): RouteNotificationResult {
         return route(command.summaryId, RoutingJobKind.SUMMARY, command.keyword) { job ->
-            recipientReaderPort.findSubscribers(command.keyword).map { recipient ->
+            findAllSubscribers(command.keyword).map { recipient ->
                 request(
                     requestId = RoutingRequestId.forSummary(command.summaryId, recipient.recipientId, recipient.channel),
                     recipient = recipient,
@@ -64,6 +64,20 @@ class RouteNotificationService(
                 )
             }
         }
+    }
+
+    private suspend fun findAllSubscribers(keyword: String): List<Recipient> {
+        val recipients = mutableListOf<Recipient>()
+        var cursor: String? = null
+        do {
+            val page = recipientReaderPort.findSubscribers(setOf(keyword), cursor)
+            page.recipients.mapTo(recipients) { Recipient(recipientId = it.recipientId, channel = it.channel) }
+            check(page.nextCursor == null || page.nextCursor != cursor) {
+                "recipient page cursor did not advance. cursor=$cursor"
+            }
+            cursor = page.nextCursor
+        } while (cursor != null)
+        return recipients
     }
 
     private fun request(

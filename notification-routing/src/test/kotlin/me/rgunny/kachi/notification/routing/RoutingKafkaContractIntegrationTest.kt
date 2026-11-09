@@ -73,10 +73,10 @@ class RoutingKafkaContractIntegrationTest {
         val keyword = uniqueKeyword("tesla")
         val summaryId = UUID.randomUUID().toString()
         userService.respond(
-            RoutingTestFixture.SUBSCRIPTIONS_PATH,
+            RoutingTestFixture.RECIPIENTS_SEARCH_PATH,
             TestStubResponse(
                 statusCode = 200,
-                body = """{"success":true,"data":[{"userId":"user-1","channel":"SLACK"},{"userId":"user-1","channel":"TELEGRAM"},{"userId":"user-2","channel":"DISCORD"}]}"""
+                body = """{"success":true,"data":{"keywords":[{"canonicalKey":"$keyword","displayName":"$keyword"}],"recipients":[{"userId":"user-1","channel":"SLACK","keywordIndexes":[0]},{"userId":"user-1","channel":"TELEGRAM","keywordIndexes":[0]},{"userId":"user-2","channel":"DISCORD","keywordIndexes":[0]}],"nextCursor":null},"error":null}"""
             )
         )
         val event = RoutingTestFixture.summaryCreatedEvent(summaryId = summaryId, keyword = keyword)
@@ -99,7 +99,7 @@ class RoutingKafkaContractIntegrationTest {
             assertEquals(keyword, requested.origin?.keyword)
             assertTrue(requested.message.contains(event.title))
         }
-        assertEquals(1, userService.requestCount(RoutingTestFixture.SUBSCRIPTIONS_PATH))
+        assertEquals(1, userService.requestCount(RoutingTestFixture.RECIPIENTS_SEARCH_PATH))
     }
 
     @Test
@@ -147,7 +147,7 @@ class RoutingKafkaContractIntegrationTest {
         assertEquals(1, dlt.size)
         assertEquals(jsonMapper.writeValueAsString(event), dlt.single().value())
         // user-service를 부르기 전에 걸러진다.
-        assertEquals(0, userService.requestCount(RoutingTestFixture.SUBSCRIPTIONS_PATH))
+        assertEquals(0, userService.requestCount(RoutingTestFixture.RECIPIENTS_SEARCH_PATH))
         assertTrue(recordsOf(properties.requestTopic, expected = 1, timeout = SHORT_TIMEOUT) { it.key().contains(event.summaryId) }.isEmpty())
     }
 

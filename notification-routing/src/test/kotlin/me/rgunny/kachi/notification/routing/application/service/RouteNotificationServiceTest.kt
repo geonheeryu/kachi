@@ -6,6 +6,9 @@ import me.rgunny.kachi.notification.routing.application.port.inbound.routing.mod
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.model.RouteSummaryCommand
 import me.rgunny.kachi.notification.routing.application.port.outbound.messaging.model.NotificationRequestOrigin
 import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.Recipient
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.RecipientPage
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedKeyword
+import me.rgunny.kachi.notification.routing.application.port.outbound.recipient.model.SubscribedRecipient
 import me.rgunny.kachi.notification.routing.domain.RoutingJob
 import me.rgunny.kachi.notification.routing.domain.RoutingJobKind
 import me.rgunny.kachi.notification.routing.domain.RoutingJobStatus
@@ -28,10 +31,16 @@ class RouteNotificationServiceTest {
     private val now = NOW
     private val clock = CLOCK
 
+    private val tesla = listOf(SubscribedKeyword("tesla", "Tesla"))
     private val subscribers = listOf(
-        Recipient("user-1", NotificationChannel.SLACK),
-        Recipient("user-1", NotificationChannel.TELEGRAM),
-        Recipient("user-2", NotificationChannel.DISCORD),
+        RecipientPage(
+            recipients = listOf(
+                SubscribedRecipient("user-1", NotificationChannel.SLACK, tesla),
+                SubscribedRecipient("user-1", NotificationChannel.TELEGRAM, tesla),
+                SubscribedRecipient("user-2", NotificationChannel.DISCORD, tesla),
+            ),
+            nextCursor = null,
+        ),
     )
     private val admins = listOf(
         Recipient("admin-1", NotificationChannel.SLACK),
@@ -52,7 +61,7 @@ class RouteNotificationServiceTest {
         assertEquals(RouteNotificationOutcome.ROUTED, result.outcome)
         assertEquals(3, result.targetCount)
         assertEquals(3, result.publishedCount)
-        assertEquals(listOf("tesla"), reader.requestedKeywords)
+        assertEquals(listOf<Pair<Set<String>, String?>>(setOf("tesla") to null), reader.subscriberRequests)
         assertEquals(
             listOf("sum:summary-1:u:user-1:c:SLACK", "sum:summary-1:u:user-1:c:TELEGRAM", "sum:summary-1:u:user-2:c:DISCORD"),
             publisher.published.map { it.requestId },
@@ -73,6 +82,34 @@ class RouteNotificationServiceTest {
     }
 
     @Test
+    @DisplayName("nextCursor가 없을 때까지 페이지를 이어 읽고 모은 수신자를 모두 발행한다")
+    fun collectSubscriberPages() = runSuspend {
+        val jobs = FakeRoutingJobPersistencePort()
+        val reader = FakeRecipientReaderPort(
+            listOf(
+                RecipientPage(listOf(SubscribedRecipient("user-1", NotificationChannel.SLACK, tesla)), nextCursor = "user-1"),
+                RecipientPage(emptyList(), nextCursor = "user-2"),
+                RecipientPage(listOf(SubscribedRecipient("user-3", NotificationChannel.DISCORD, tesla)), nextCursor = null),
+            )
+        )
+        val publisher = FakeNotificationRequestPublisherPort()
+
+        val result = service(jobs, reader, publisher).routeSummary(summaryCommand())
+
+        assertEquals(
+            listOf<Pair<Set<String>, String?>>(setOf("tesla") to null, setOf("tesla") to "user-1", setOf("tesla") to "user-2"),
+            reader.subscriberRequests,
+        )
+        assertEquals(
+            listOf("sum:summary-1:u:user-1:c:SLACK", "sum:summary-1:u:user-3:c:DISCORD"),
+            publisher.published.map { it.requestId },
+        )
+        assertEquals(2, result.targetCount)
+        assertEquals(2, result.publishedCount)
+        assertEquals(RoutingJobStatus.COMPLETED, jobs.saved.single().status)
+    }
+
+    @Test
     @DisplayName("COMPLETED job은 다시 라우팅하지 않는다")
     fun skipCompleted() = runSuspend {
         val jobs = FakeRoutingJobPersistencePort().also {
@@ -86,7 +123,7 @@ class RouteNotificationServiceTest {
         assertEquals(RouteNotificationOutcome.SKIPPED, result.outcome)
         assertEquals(3, result.targetCount)
         assertTrue(publisher.published.isEmpty())
-        assertTrue(reader.requestedKeywords.isEmpty())
+        assertTrue(reader.subscriberRequests.isEmpty())
         assertTrue(jobs.saved.isEmpty())
     }
 
@@ -172,7 +209,7 @@ class RouteNotificationServiceTest {
     @DisplayName("격리 알림은 관리자 x 채널마다 구독자 알림과 같은 모양으로 발행한다")
     fun routeQuarantine() = runSuspend {
         val jobs = FakeRoutingJobPersistencePort()
-        val reader = FakeRecipientReaderPort(subscribers = subscribers, admins = admins)
+        val reader = FakeRecipientReaderPort(subscriberPages = subscribers, admins = admins)
         val publisher = FakeNotificationRequestPublisherPort()
 
         val result = service(jobs, reader, publisher).routeQuarantine(
@@ -182,7 +219,7 @@ class RouteNotificationServiceTest {
         assertEquals(RouteNotificationOutcome.ROUTED, result.outcome)
         assertEquals(3, result.targetCount)
         assertEquals(3, result.publishedCount)
-        assertTrue(reader.requestedKeywords.isEmpty())
+        assertTrue(reader.subscriberRequests.isEmpty())
         assertEquals(1, reader.adminRequests)
         assertEquals(
             listOf(
@@ -208,7 +245,7 @@ class RouteNotificationServiceTest {
     fun routeQuarantineWithoutAdmins() = runSuspend {
         val jobs = FakeRoutingJobPersistencePort()
         val publisher = FakeNotificationRequestPublisherPort()
-        val service = service(jobs, FakeRecipientReaderPort(subscribers = subscribers), publisher)
+        val service = service(jobs, FakeRecipientReaderPort(subscriberPages = subscribers), publisher)
 
         val result = service.routeQuarantine(RouteQuarantineCommand("quarantine-1:1", "tesla", "quarantine body"))
 
