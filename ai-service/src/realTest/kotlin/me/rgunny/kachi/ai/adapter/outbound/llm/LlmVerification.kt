@@ -19,7 +19,6 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.web.reactive.function.client.bodyToMono
 import java.net.URI
-import java.util.UUID
 import kotlin.test.assertTrue
 import kotlin.time.measureTimedValue
 
@@ -82,7 +81,6 @@ abstract class LlmVerification(
         val (generated, latency) = measureTimedValue {
             runBlocking {
                 when (use) {
-                    LlmUse.NEWS_SUMMARY -> summarize(guarded)
                     LlmUse.STORY_SUMMARY -> summarizeStory(guarded)
                     LlmUse.KEYWORD_EXPANSION -> expand(guarded)
                 }
@@ -98,15 +96,6 @@ abstract class LlmVerification(
             model,
             "use=$use served=${metadata.model} latency=${latency.inWholeMilliseconds}ms " +
                 "tokens=${metadata.tokenUsage.inputTokens}/${metadata.tokenUsage.outputTokens} ${generated.outcome}"
-        )
-    }
-
-    private suspend fun summarize(guarded: GuardedLlmModel): Generated {
-        val result = guarded.summarizeNews(keyword = AiTestFixture.keyword(), articles = ARTICLES)
-
-        return Generated(
-            metadata = result.metadata,
-            outcome = "sentiment=${result.sentiment} title=\"${result.title}\""
         )
     }
 
@@ -191,22 +180,6 @@ abstract class LlmVerification(
                 title = "NVIDIA raises full-year guidance after record quarter",
                 excerpt = "Following record data center revenue, NVIDIA raised its full-year revenue guidance above analyst expectations.",
                 publishedAt = AiTestFixture.NOW
-            )
-        )
-
-        /** 흔한 키워드의 헤드라인 세 개로 이루어진 뉴스 요약 입력. */
-        val ARTICLES = listOf(
-            AiTestFixture.newsArticle(
-                id = UUID.fromString("018f0000-0000-7000-8000-000000000101"),
-                title = "NVIDIA reports record data center revenue as AI demand accelerates"
-            ),
-            AiTestFixture.newsArticle(
-                id = UUID.fromString("018f0000-0000-7000-8000-000000000102"),
-                title = "NVIDIA unveils next-generation GPU architecture at GTC"
-            ),
-            AiTestFixture.newsArticle(
-                id = UUID.fromString("018f0000-0000-7000-8000-000000000103"),
-                title = "Regulators review NVIDIA export licenses for advanced chips"
             )
         )
     }

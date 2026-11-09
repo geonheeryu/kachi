@@ -16,8 +16,6 @@ spring:
 kachi:
   ai:
     scheduler:
-      news-summary:
-        enabled: true
       keyword-expansion:
         enabled: true
       story-summary:
@@ -33,12 +31,8 @@ kachi:
     clients:
       user-service:
         base-url: ${KACHI_USER_SERVICE_BASE_URL:http://localhost:8080}
-      collector-service:
-        base-url: ${KACHI_COLLECTOR_SERVICE_BASE_URL:http://localhost:8082}
     llm:
       uses:
-        NEWS_SUMMARY:
-          candidates: [OLLAMA_QWEN3_27B]
         STORY_SUMMARY:
           candidates: [OLLAMA_QWEN3_27B]
         KEYWORD_EXPANSION:

@@ -7,13 +7,10 @@ import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmHold
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmModelStatus
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.llm.LlmBilling
 import me.rgunny.kachi.ai.domain.llm.LlmFailure
@@ -69,10 +66,6 @@ class GuardedLlmModel(
     /**
      * 위임 대상의 plan을 들고 호출은 이 가드를 거치는 실행 단위를 돌려준다.
      */
-    override fun prepareNewsSummary(): PreparedLlmNewsSummary {
-        return GuardedPreparedNewsSummary(plan = delegate.prepareNewsSummary().plan, model = this)
-    }
-
     override fun prepareStorySummary(): PreparedLlmStorySummary {
         return GuardedPreparedStorySummary(plan = delegate.prepareStorySummary().plan, model = this)
     }
@@ -82,13 +75,6 @@ class GuardedLlmModel(
         maxExpansions: Int
     ): LlmKeywordExpansionResult {
         return guarded { delegate.expandKeyword(keyword, maxExpansions) }
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        return guarded { delegate.summarizeNews(keyword, articles) }
     }
 
     override suspend fun summarizeStory(

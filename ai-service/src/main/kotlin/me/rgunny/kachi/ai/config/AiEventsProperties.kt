@@ -20,13 +20,11 @@ data class AiEventsProperties(
 
     data class Topics(
         val summaryCreated: String,
-        val keywordQuarantined: String,
         val storySplitRequested: String,
         val storyQuarantined: String
     ) {
         init {
             require(summaryCreated.isNotBlank()) { "summary-created topic은 비어 있을 수 없습니다" }
-            require(keywordQuarantined.isNotBlank()) { "keyword-quarantined topic은 비어 있을 수 없습니다" }
             require(storySplitRequested.isNotBlank()) { "story-split-requested topic은 비어 있을 수 없습니다" }
             require(storyQuarantined.isNotBlank()) { "story-quarantined topic은 비어 있을 수 없습니다" }
         }
@@ -35,7 +33,6 @@ data class AiEventsProperties(
     fun topicOf(eventType: AiOutboxEventType): String {
         return when (eventType) {
             AiOutboxEventType.SUMMARY_CREATED -> topics.summaryCreated
-            AiOutboxEventType.KEYWORD_QUARANTINED -> topics.keywordQuarantined
             AiOutboxEventType.STORY_SPLIT_REQUESTED -> topics.storySplitRequested
             AiOutboxEventType.STORY_QUARANTINED -> topics.storyQuarantined
         }

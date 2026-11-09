@@ -5,7 +5,6 @@ package me.rgunny.kachi.ai.domain.outbox
  */
 enum class AiOutboxEventType {
     SUMMARY_CREATED,
-    KEYWORD_QUARANTINED,
     STORY_SPLIT_REQUESTED,
     STORY_QUARANTINED
 }

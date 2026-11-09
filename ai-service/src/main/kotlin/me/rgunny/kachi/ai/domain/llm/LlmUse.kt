@@ -6,7 +6,6 @@ package me.rgunny.kachi.ai.domain.llm
  * 상수는 호출 포트의 메서드와 1:1이다.
  */
 enum class LlmUse {
-    NEWS_SUMMARY,
     STORY_SUMMARY,
     KEYWORD_EXPANSION
 }

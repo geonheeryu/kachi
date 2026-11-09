@@ -7,7 +7,7 @@ import java.time.Duration
 /**
  * 주기 키워드 확장 실행 설정.
  *
- * 확장 결과는 뉴스 요약과 달리 자주 바뀌지 않고 키워드마다 LLM을 호출하므로 기본 주기를 길게 둔다.
+ * 확장 결과는 자주 바뀌지 않고 키워드마다 LLM을 호출하므로 기본 주기를 길게 둔다.
  */
 @ConfigurationProperties(prefix = AiKeywordExpansionSchedulerProperties.PREFIX)
 data class AiKeywordExpansionSchedulerProperties(

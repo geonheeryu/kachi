@@ -10,7 +10,7 @@ import java.util.UUID
 /**
  * story 요약 버전이 새로 만들어진 사건.
  *
- * 키워드 요약의 [SummaryCreatedEvent]와 같은 topic으로 나가며 schemaVersion 2다.
+ * schemaVersion은 2다.
  */
 data class StorySummaryCreatedEvent(
     val summaryId: UUID,

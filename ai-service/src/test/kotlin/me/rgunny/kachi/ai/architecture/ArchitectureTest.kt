@@ -93,13 +93,11 @@ class ArchitectureTest {
                 "..adapter.outbound.keyword..",
                 "..adapter.outbound.llm..",
                 "..adapter.outbound.lock..",
-                "..adapter.outbound.news..",
                 "..adapter.outbound.outbox..",
                 "..adapter.outbound.quarantine..",
                 "..adapter.outbound.run..",
                 "..adapter.outbound.story..",
                 "..adapter.outbound.summary..",
-                "..adapter.outbound.watermark..",
                 "..adapter.outbound.persistence..",
             )
             .because("adapter/outbound 1단은 그 어댑터가 구현하는 포트 패키지의 이름이다. 포트가 다른 어댑터들이 같은 구현 클래스를 함께 쓸 때만 기술 이름을 쓴다 (docs/패키지구조.md)")

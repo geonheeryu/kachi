@@ -1,13 +1,10 @@
 package me.rgunny.kachi.ai.application.port.outbound.llm
 
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 
 /**
@@ -18,19 +15,12 @@ import me.rgunny.kachi.ai.domain.keyword.AiKeyword
  */
 interface LlmProviderPort {
 
-    fun prepareNewsSummary(): PreparedLlmNewsSummary
-
     fun prepareStorySummary(): PreparedLlmStorySummary
 
     suspend fun expandKeyword(
         keyword: AiKeyword,
         maxExpansions: Int
     ): LlmKeywordExpansionResult
-
-    suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult
 
     suspend fun summarizeStory(
         keywords: List<AiKeyword>,

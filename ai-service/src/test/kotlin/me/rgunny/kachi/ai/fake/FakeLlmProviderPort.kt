@@ -1,16 +1,12 @@
 package me.rgunny.kachi.ai.fake
 
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryPlan
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryPlan
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.keyword.ExpandedKeyword
 import me.rgunny.kachi.ai.domain.summary.NewsSummarySentiment
@@ -18,15 +14,14 @@ import me.rgunny.kachi.ai.domain.summary.StoryDevelopmentKind
 import me.rgunny.kachi.ai.fixture.AiTestFixture
 
 /**
- * 키워드 확장·뉴스 요약·story 요약을 모두 지원하는 LLM provider fake.
+ * 키워드 확장과 story 요약을 지원하는 LLM provider fake.
  *
- * [failedKeywords]의 키워드는 확장과 뉴스 요약 호출에서 [IllegalStateException]으로 실패한다.
+ * [failedKeywords]의 키워드는 확장 호출에서 [IllegalStateException]으로 실패한다.
  * [failureByKeyword]에 예외가 있는 키워드는 그 예외를 그대로 던진다.
  * [storyFailure]가 있으면 story 요약 호출에서 던진다.
  */
 class FakeLlmProviderPort : LlmProviderPort {
     var expandCallCount: Int = 0
-    var summarizeCallCount: Int = 0
     var summarizeStoryCallCount: Int = 0
     var failedKeywords: Set<AiKeyword> = emptySet()
     var failureByKeyword: Map<AiKeyword, Throwable> = emptyMap()
@@ -34,16 +29,6 @@ class FakeLlmProviderPort : LlmProviderPort {
     var storyDevelopmentKind: StoryDevelopmentKind = StoryDevelopmentKind.DEVELOPMENT
     var lastStoryPreviousSummary: PreviousStorySummary? = null
     var lastStoryArticles: List<StorySummaryArticle> = emptyList()
-
-    override fun prepareNewsSummary(): PreparedLlmNewsSummary {
-        return FakePreparedNewsSummary(
-            plan = LlmNewsSummaryPlan(
-                provider = AiTestFixture.PROVIDER,
-                promptVersion = AiTestFixture.NEWS_SUMMARY_PROMPT_VERSION
-            ),
-            provider = this
-        )
-    }
 
     override fun prepareStorySummary(): PreparedLlmStorySummary {
         return FakePreparedStorySummary(
@@ -68,21 +53,6 @@ class FakeLlmProviderPort : LlmProviderPort {
                 ExpandedKeyword.of("GPU")
             ).take(maxExpansions),
             metadata = AiTestFixture.keywordExpansionMetadata()
-        )
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        summarizeCallCount += 1
-        failIfRequested(keyword)
-
-        return LlmNewsSummaryResult(
-            title = "${keyword.value} 요약",
-            content = "요약 본문",
-            sentiment = NewsSummarySentiment.NEUTRAL,
-            metadata = AiTestFixture.newsSummaryMetadata()
         )
     }
 

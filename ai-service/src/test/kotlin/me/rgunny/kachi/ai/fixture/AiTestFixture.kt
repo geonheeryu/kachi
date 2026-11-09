@@ -4,9 +4,7 @@ import me.rgunny.kachi.ai.adapter.outbound.lock.InMemoryExecutionLockAdapter
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
 import me.rgunny.kachi.ai.application.exception.LlmProviderException
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmGenerationMetadata
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.KeywordQuarantinedEvent
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.SummaryCreatedEvent
+import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
 import me.rgunny.kachi.ai.application.service.outbox.AiOutboxRelayPolicy
 import me.rgunny.kachi.ai.config.AiEventsProperties
 import me.rgunny.kachi.ai.config.AiOutboxRelayProperties
@@ -24,7 +22,6 @@ import me.rgunny.kachi.ai.domain.keyword.KeywordExpansion
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxClaim
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxId
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxStatus
-import me.rgunny.kachi.ai.domain.quarantine.KeywordQuarantine
 import me.rgunny.kachi.ai.domain.llm.LlmFailure
 import me.rgunny.kachi.ai.domain.llm.LlmFailureCode
 import me.rgunny.kachi.ai.domain.llm.LlmBilling
@@ -32,7 +29,6 @@ import me.rgunny.kachi.ai.domain.llm.LlmModel
 import me.rgunny.kachi.ai.domain.llm.LlmProvider
 import me.rgunny.kachi.ai.domain.llm.LlmUse
 import me.rgunny.kachi.ai.domain.llm.KeywordExpansionPrompt
-import me.rgunny.kachi.ai.domain.llm.NewsSummaryPrompt
 import me.rgunny.kachi.ai.domain.llm.PromptVersion
 import me.rgunny.kachi.ai.domain.llm.StorySummaryPrompt
 import me.rgunny.kachi.ai.domain.llm.TokenUsage
@@ -45,12 +41,10 @@ import me.rgunny.kachi.ai.domain.run.AiRunTargetType
 import me.rgunny.kachi.ai.domain.story.AiStory
 import me.rgunny.kachi.ai.domain.story.AiStoryArticle
 import me.rgunny.kachi.ai.domain.story.StoryId
-import me.rgunny.kachi.ai.domain.summary.NewsSummary
 import me.rgunny.kachi.ai.domain.summary.NewsSummarySentiment
 import me.rgunny.kachi.ai.domain.summary.StoryDevelopmentKind
 import me.rgunny.kachi.ai.domain.summary.StorySummary
 import me.rgunny.kachi.ai.domain.quarantine.StoryQuarantine
-import me.rgunny.kachi.ai.domain.watermark.SummaryWatermark
 import me.rgunny.kachi.ai.application.port.inbound.story.model.CreatedStorySummaryResult
 import me.rgunny.kachi.ai.application.service.story.StoryQuarantinePolicy
 import me.rgunny.kachi.ai.application.service.story.StorySummaryPolicy
@@ -84,7 +78,6 @@ object AiTestFixture {
 
     /** 요청에 실은 모델 code. */
     val REQUESTED_MODEL: String = LLM_MODEL.code
-    val NEWS_SUMMARY_PROMPT_VERSION: PromptVersion = NewsSummaryPrompt.version
     val STORY_SUMMARY_PROMPT_VERSION: PromptVersion = StorySummaryPrompt.version
     val KEYWORD_EXPANSION_PROMPT_VERSION: PromptVersion = KeywordExpansionPrompt.version
     val TOKEN_USAGE: TokenUsage = TokenUsage(inputTokens = 10, outputTokens = 20)
@@ -99,21 +92,6 @@ object AiTestFixture {
 
     fun keyword(value: String = "NVIDIA"): AiKeyword {
         return AiKeyword.of(value)
-    }
-
-    fun newsArticle(
-        id: UUID = NEWS_ID,
-        title: String = "NVIDIA news"
-    ): NewsArticle {
-        return NewsArticle(
-            id = id,
-            source = "GOOGLE",
-            title = title,
-            url = "https://news.example.com/nvidia",
-            publishedAt = NOW.minus(Duration.ofDays(1)),
-            collectedAt = NOW.minus(Duration.ofDays(1)).plusSeconds(60),
-            matchedKeywords = listOf("NVIDIA")
-        )
     }
 
     fun outbox(
@@ -226,7 +204,6 @@ object AiTestFixture {
     }
 
     const val EVENT_TOPIC_SUMMARY_CREATED: String = "ai.summary.created"
-    const val EVENT_TOPIC_KEYWORD_QUARANTINED: String = "ai.keyword.quarantined"
     const val EVENT_TOPIC_STORY_SPLIT_REQUESTED: String = "ai.story.split-requested"
     const val EVENT_TOPIC_STORY_QUARANTINED: String = "ai.story.quarantined"
     const val EVENT_TOPIC_STORY_ARTICLE_ATTACHED: String = "story.article.attached"
@@ -235,7 +212,6 @@ object AiTestFixture {
     fun eventsProperties(
         enabled: Boolean = true,
         summaryCreatedTopic: String = EVENT_TOPIC_SUMMARY_CREATED,
-        keywordQuarantinedTopic: String = EVENT_TOPIC_KEYWORD_QUARANTINED,
         storySplitRequestedTopic: String = EVENT_TOPIC_STORY_SPLIT_REQUESTED,
         storyQuarantinedTopic: String = EVENT_TOPIC_STORY_QUARANTINED
     ): AiEventsProperties {
@@ -243,7 +219,6 @@ object AiTestFixture {
             enabled = enabled,
             topics = AiEventsProperties.Topics(
                 summaryCreated = summaryCreatedTopic,
-                keywordQuarantined = keywordQuarantinedTopic,
                 storySplitRequested = storySplitRequestedTopic,
                 storyQuarantined = storyQuarantinedTopic
             )
@@ -262,21 +237,6 @@ object AiTestFixture {
             maxDelay = maxDelay,
             multiplier = multiplier
         )
-    }
-
-    fun summaryCreatedEvent(summary: NewsSummary = newsSummary()): SummaryCreatedEvent {
-        return SummaryCreatedEvent.from(summary)
-    }
-
-    /**
-     * 격리 상태 기록에서 만든 격리 이벤트.
-     *
-     * 기본값은 임계치에 막 도달한 기록이다.
-     */
-    fun keywordQuarantinedEvent(
-        quarantine: KeywordQuarantine = quarantine(consecutiveFailures = DEFAULT_QUARANTINE_FAILURE_THRESHOLD)
-    ): KeywordQuarantinedEvent {
-        return KeywordQuarantinedEvent.from(quarantine)
     }
 
     fun keywordExpansion(
@@ -298,38 +258,12 @@ object AiTestFixture {
         )
     }
 
-    fun newsSummary(
-        keyword: AiKeyword = keyword(),
-        sourceNewsIds: List<UUID> = listOf(NEWS_ID),
-        newsHash: String = "news-hash",
-        provider: LlmProvider = PROVIDER,
-        model: String = MODEL,
-        requestedModel: String = REQUESTED_MODEL,
-        createdAt: Instant = NOW
-    ): NewsSummary {
-        return NewsSummary.create(
-            keyword = keyword,
-            sourceNewsIds = sourceNewsIds,
-            newsHash = newsHash,
-            title = "${keyword.value} 기존 요약",
-            content = "기존 요약 본문",
-            sentiment = NewsSummarySentiment.NEUTRAL,
-            provider = provider,
-            model = model,
-            requestedModel = requestedModel,
-            promptVersion = NEWS_SUMMARY_PROMPT_VERSION,
-            tokenUsage = TOKEN_USAGE,
-            createdAt = createdAt
-        )
-    }
-
-    fun newsSummaryMetadata(): LlmGenerationMetadata {
-        return LlmGenerationMetadata(
-            provider = PROVIDER,
-            requestedModel = REQUESTED_MODEL,
-            model = MODEL,
-            promptVersion = NEWS_SUMMARY_PROMPT_VERSION,
-            tokenUsage = TOKEN_USAGE
+    fun storySummaryArticle(title: String = "NVIDIA news"): StorySummaryArticle {
+        return StorySummaryArticle(
+            source = "GOOGLE",
+            title = title,
+            excerpt = "NVIDIA 발췌문",
+            publishedAt = NOW.minus(Duration.ofDays(1))
         )
     }
 
@@ -360,17 +294,12 @@ object AiTestFixture {
         failureCount: Int = 0,
         failureReason: AiFailureReason? = null,
         startedAt: Instant = NOW,
-        finishedAt: Instant = NOW.plusSeconds(5),
-        windowFrom: Instant? = null,
-        windowTo: Instant? = null,
-        watermarkAdvanced: Boolean = false
+        finishedAt: Instant = NOW.plusSeconds(5)
     ): AiRun {
         return AiRun.start(
             targetType = targetType,
             requestedKeywords = requestedKeywords,
-            startedAt = startedAt,
-            windowFrom = windowFrom,
-            windowTo = windowTo
+            startedAt = startedAt
         ).complete(
             succeededCount = succeededCount,
             failureCount = failureCount,
@@ -378,44 +307,8 @@ object AiTestFixture {
             provider = null,
             model = null,
             promptVersion = null,
-            finishedAt = finishedAt,
-            watermarkAdvanced = watermarkAdvanced
+            finishedAt = finishedAt
         )
-    }
-
-    fun watermark(
-        position: Instant,
-        targetType: AiRunTargetType = AiRunTargetType.NEWS_SUMMARY,
-        updatedAt: Instant = position
-    ): SummaryWatermark {
-        return SummaryWatermark.initial(
-            targetType = targetType,
-            position = position,
-            updatedAt = updatedAt
-        )
-    }
-
-    /**
-     * 연속 실패가 [consecutiveFailures]회 누적된 격리 기록을 만든다.
-     *
-     * [failureThreshold]에 도달하면 격리 상태가 된다.
-     */
-    fun quarantine(
-        keyword: AiKeyword = keyword(),
-        consecutiveFailures: Int,
-        failureThreshold: Int = DEFAULT_QUARANTINE_FAILURE_THRESHOLD,
-        targetType: AiRunTargetType = AiRunTargetType.NEWS_SUMMARY,
-        updatedAt: Instant = NOW
-    ): KeywordQuarantine {
-        return (1..consecutiveFailures).fold(
-            KeywordQuarantine.track(targetType = targetType, keyword = keyword, updatedAt = updatedAt)
-        ) { quarantine, _ ->
-            quarantine.recordFailure(
-                reason = AiFailureReason.UNKNOWN,
-                failureThreshold = failureThreshold,
-                updatedAt = updatedAt
-            )
-        }
     }
 
     /**
@@ -563,7 +456,6 @@ object AiTestFixture {
             LlmModel.OLLAMA_QWEN3_27B to modelProperties(timeout = Duration.ofSeconds(150), slowAfter = Duration.ofSeconds(120))
         ),
         uses: Map<LlmUse, LlmProperties.UseProperties> = mapOf(
-            LlmUse.NEWS_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.GROQ_QWEN3_27B, LlmModel.MISTRAL_SMALL_2603)),
             LlmUse.STORY_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.GROQ_QWEN3_27B, LlmModel.MISTRAL_SMALL_2603)),
             LlmUse.KEYWORD_EXPANSION to LlmProperties.UseProperties(listOf(LlmModel.MISTRAL_SMALL_2603))
         )

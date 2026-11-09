@@ -77,12 +77,12 @@ class KafkaAiOutboxPublisherTest {
     @DisplayName("실패 메시지에 topic과 eventKey를 남긴다")
     fun describeFailureWithTopicAndEventKey() = runBlocking {
         kafkaTemplate.failureFor = { TimeoutException("timeout") }
-        val outbox = AiTestFixture.outbox(eventType = AiOutboxEventType.KEYWORD_QUARANTINED, eventKey = "q-1")
+        val outbox = AiTestFixture.outbox(eventType = AiOutboxEventType.STORY_QUARANTINED, eventKey = "q-1")
 
         val error = assertFailsWith<AiOutboxPublishException> { publisher.publish(outbox) }
 
         val message = error.message!!
-        assertTrue(message.contains("topic=${AiTestFixture.EVENT_TOPIC_KEYWORD_QUARANTINED}"), message)
+        assertTrue(message.contains("topic=${AiTestFixture.EVENT_TOPIC_STORY_QUARANTINED}"), message)
         assertTrue(message.contains("eventKey=q-1"), message)
     }
 }

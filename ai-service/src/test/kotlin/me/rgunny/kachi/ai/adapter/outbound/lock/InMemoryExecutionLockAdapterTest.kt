@@ -23,7 +23,7 @@ class InMemoryExecutionLockAdapterTest {
         val complete = CompletableDeferred<Unit>()
 
         val first = async {
-            adapter.withLock(AiExecutionLock.NEWS_SUMMARY) {
+            adapter.withLock(AiExecutionLock.STORY_SUMMARY) {
                 started.complete(Unit)
                 complete.await()
                 "실행됨"
@@ -32,7 +32,7 @@ class InMemoryExecutionLockAdapterTest {
         started.await()
 
         var secondActionCalled = false
-        val second = adapter.withLock(AiExecutionLock.NEWS_SUMMARY) { secondActionCalled = true }
+        val second = adapter.withLock(AiExecutionLock.STORY_SUMMARY) { secondActionCalled = true }
         complete.complete(Unit)
 
         val blocked = assertIs<ExecutionLockOutcome.AlreadyHeld>(second)
@@ -44,8 +44,8 @@ class InMemoryExecutionLockAdapterTest {
     @Test
     @DisplayName("실행이 끝나면 다음 요청이 lock을 얻는다")
     fun releaseLockAfterActionFinished() = runBlocking {
-        val first = adapter.withLock(AiExecutionLock.NEWS_SUMMARY) { 1 }
-        val second = adapter.withLock(AiExecutionLock.NEWS_SUMMARY) { 2 }
+        val first = adapter.withLock(AiExecutionLock.STORY_SUMMARY) { 1 }
+        val second = adapter.withLock(AiExecutionLock.STORY_SUMMARY) { 2 }
 
         assertEquals(1, assertIs<ExecutionLockOutcome.Executed<Int>>(first).value)
         assertEquals(2, assertIs<ExecutionLockOutcome.Executed<Int>>(second).value)
@@ -55,10 +55,10 @@ class InMemoryExecutionLockAdapterTest {
     @DisplayName("작업이 예외로 끝나도 lock을 풀고 예외를 그대로 올린다")
     fun releaseLockWhenActionThrows() = runBlocking {
         assertFailsWith<IllegalStateException> {
-            adapter.withLock(AiExecutionLock.NEWS_SUMMARY) { error("작업 실패") }
+            adapter.withLock(AiExecutionLock.STORY_SUMMARY) { error("작업 실패") }
         }
 
-        val next = adapter.withLock(AiExecutionLock.NEWS_SUMMARY) { "다음 실행" }
+        val next = adapter.withLock(AiExecutionLock.STORY_SUMMARY) { "다음 실행" }
 
         assertEquals("다음 실행", assertIs<ExecutionLockOutcome.Executed<String>>(next).value)
     }
@@ -70,7 +70,7 @@ class InMemoryExecutionLockAdapterTest {
         val complete = CompletableDeferred<Unit>()
 
         val collection = async {
-            adapter.withLock(AiExecutionLock.NEWS_SUMMARY) {
+            adapter.withLock(AiExecutionLock.STORY_SUMMARY) {
                 started.complete(Unit)
                 complete.await()
             }

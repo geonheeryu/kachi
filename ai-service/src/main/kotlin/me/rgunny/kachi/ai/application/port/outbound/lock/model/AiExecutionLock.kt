@@ -9,11 +9,6 @@ enum class AiExecutionLock(
 ) : ExecutionLockTarget {
 
     /**
-     * 클러스터에서 한 번만 도는 뉴스 요약 실행(LLM 호출 비용).
-     */
-    NEWS_SUMMARY("ai-service:news-summary", ExecutionLockScope.CLUSTER),
-
-    /**
      * 클러스터에서 한 번만 도는 키워드 확장 실행(LLM 호출 비용).
      */
     KEYWORD_EXPANSION("ai-service:keyword-expansion", ExecutionLockScope.CLUSTER),

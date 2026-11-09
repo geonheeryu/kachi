@@ -3,13 +3,10 @@ package me.rgunny.kachi.ai.adapter.outbound.llm
 import me.rgunny.kachi.ai.application.exception.LlmProviderException
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.llm.LlmFailure
 import me.rgunny.kachi.ai.domain.llm.LlmFailureCode
@@ -42,21 +39,6 @@ class RoutingLlmProvider(
      *
      * 후보가 전부 차단된 상태여도 실패하지 않는다.
      */
-    override fun prepareNewsSummary(): PreparedLlmNewsSummary {
-        val order = candidatesOf(LlmUse.NEWS_SUMMARY)
-
-        return RoutingPreparedNewsSummary(
-            plan = order.first().prepareNewsSummary().plan,
-            router = this,
-            order = order
-        )
-    }
-
-    /**
-     * 첫 후보의 plan을 든 실행 단위를 돌려준다.
-     *
-     * 후보가 전부 차단된 상태여도 실패하지 않는다.
-     */
     override fun prepareStorySummary(): PreparedLlmStorySummary {
         val order = candidatesOf(LlmUse.STORY_SUMMARY)
 
@@ -72,13 +54,6 @@ class RoutingLlmProvider(
         maxExpansions: Int
     ): LlmKeywordExpansionResult {
         return callWithFailover(candidatesOf(LlmUse.KEYWORD_EXPANSION)) { it.expandKeyword(keyword, maxExpansions) }
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        return callWithFailover(candidatesOf(LlmUse.NEWS_SUMMARY)) { it.summarizeNews(keyword, articles) }
     }
 
     override suspend fun summarizeStory(
