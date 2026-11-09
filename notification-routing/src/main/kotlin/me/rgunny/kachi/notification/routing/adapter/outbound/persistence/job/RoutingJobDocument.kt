@@ -18,6 +18,7 @@ data class RoutingJobDocument(
     val kind: String,
     val keyword: String,
     val status: String,
+    val cursor: String?,
     val targetCount: Int,
     val publishedCount: Int,
     val createdAt: Instant,

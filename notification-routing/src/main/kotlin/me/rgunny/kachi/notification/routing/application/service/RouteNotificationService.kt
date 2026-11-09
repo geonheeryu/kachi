@@ -103,12 +103,13 @@ class RouteNotificationService(
         }
 
         // 3. 완료 기록.
-        val completed = routingJobPersistencePort.save(
-            job.complete(
-                targetCount = requests.size,
-                publishedCount = published,
+        val completed = routingJobPersistencePort.saveTransition(
+            previous = job,
+            next = job.complete(
+                targetDelta = requests.size,
+                publishedDelta = published,
                 now = clock.instant(),
-            )
+            ),
         )
         return result(completed, RouteNotificationOutcome.ROUTED)
     }
