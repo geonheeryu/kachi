@@ -103,16 +103,16 @@ class ArchitectureTest {
 
         @ArchTest
         @JvmField
-        val outbound_ports_are_interfaces: ArchRule = classes()
-            .that().resideInAPackage("..application.port.outbound..")
-            .and().areNotEnums()
+        val outbound_port_roots_hold_only_interfaces: ArchRule = classes()
+            .that().resideInAPackage("..application.port.outbound.*")
+            .and().areTopLevelClasses()
             .should().beInterfaces()
 
         @ArchTest
         @JvmField
-        val inbound_use_case_ports_are_interfaces: ArchRule = classes()
-            .that().resideInAPackage("..application.port.inbound..")
-            .and().haveSimpleNameEndingWith("UseCase")
+        val inbound_port_roots_hold_only_interfaces: ArchRule = classes()
+            .that().resideInAPackage("..application.port.inbound.*")
+            .and().areTopLevelClasses()
             .should().beInterfaces()
 
         @ArchTest

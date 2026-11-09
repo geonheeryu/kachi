@@ -9,7 +9,7 @@ import me.rgunny.kachi.collector.application.port.inbound.collection.model.Colle
 import me.rgunny.kachi.collector.domain.CollectionRunId
 import me.rgunny.kachi.collector.domain.CollectionRunStatus
 import me.rgunny.kachi.collector.domain.CollectionTargetType
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.fixture.CollectorTestFixture
 import me.rgunny.kachi.collector.fake.FakeExecutionLockPort
 import org.junit.jupiter.api.DisplayName

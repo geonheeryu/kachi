@@ -1,9 +1,9 @@
 package me.rgunny.kachi.ai.adapter.outbound.lock
 
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockHolder
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockHolder
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockTarget
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockTarget
 import java.time.Clock
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap

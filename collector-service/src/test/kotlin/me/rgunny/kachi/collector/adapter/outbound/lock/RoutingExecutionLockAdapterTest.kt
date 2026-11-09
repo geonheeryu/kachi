@@ -1,11 +1,11 @@
 package me.rgunny.kachi.collector.adapter.outbound.lock
 
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.collector.application.port.outbound.lock.CollectorExecutionLock
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.CollectorExecutionLock
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockPort
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockScope
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockTarget
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockScope
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockTarget
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals

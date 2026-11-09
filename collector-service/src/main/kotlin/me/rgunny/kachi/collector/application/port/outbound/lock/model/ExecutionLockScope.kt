@@ -1,4 +1,4 @@
-package me.rgunny.kachi.collector.application.port.outbound.lock
+package me.rgunny.kachi.collector.application.port.outbound.lock.model
 
 /**
  * 실행 lock이 미치는 범위.

@@ -3,8 +3,8 @@ package me.rgunny.kachi.ai.adapter.outbound.lock
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.ai.application.port.outbound.lock.AiExecutionLock
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.AiExecutionLock
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.fixture.AiTestFixture
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

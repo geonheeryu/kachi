@@ -1,9 +1,9 @@
 package me.rgunny.kachi.collector.adapter.outbound.lock
 
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockPort
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockScope
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockTarget
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockScope
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockTarget
 
 /**
  * 실행 단위가 선언한 범위에 맞는 lock 구현으로 넘기는 라우터.

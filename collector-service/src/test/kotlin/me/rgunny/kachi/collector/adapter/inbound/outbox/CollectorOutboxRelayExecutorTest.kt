@@ -4,7 +4,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.collector.application.port.inbound.outbox.RelayCollectorOutboxUseCase
 import me.rgunny.kachi.collector.fake.BlockingRelayCollectorOutboxUseCase
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.fake.FailingRelayCollectorOutboxUseCase
 import me.rgunny.kachi.collector.fake.FakeExecutionLockPort
 import me.rgunny.kachi.collector.fake.RecordingRelayCollectorOutboxUseCase

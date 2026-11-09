@@ -1,4 +1,4 @@
-package me.rgunny.kachi.collector.application.port.outbound.lock
+package me.rgunny.kachi.collector.application.port.outbound.lock.model
 
 /**
  * collector-service가 lock으로 보호하는 실행 단위.

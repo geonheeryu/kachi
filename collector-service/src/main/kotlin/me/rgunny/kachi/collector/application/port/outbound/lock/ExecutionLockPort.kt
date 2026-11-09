@@ -1,5 +1,8 @@
 package me.rgunny.kachi.collector.application.port.outbound.lock
 
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockTarget
+
 /**
  * 같은 작업이 동시에 두 번 실행되지 않게 하는 실행 lock.
  *

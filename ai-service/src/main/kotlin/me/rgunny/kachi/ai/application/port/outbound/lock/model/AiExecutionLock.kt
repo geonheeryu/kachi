@@ -1,4 +1,4 @@
-package me.rgunny.kachi.ai.application.port.outbound.lock
+package me.rgunny.kachi.ai.application.port.outbound.lock.model
 
 /**
  * ai-service가 lock으로 보호하는 실행 단위.

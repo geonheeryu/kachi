@@ -3,7 +3,7 @@ package me.rgunny.kachi.collector.config
 import me.rgunny.kachi.collector.adapter.outbound.lock.InMemoryExecutionLockAdapter
 import me.rgunny.kachi.collector.adapter.outbound.lock.RoutingExecutionLockAdapter
 import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockPort
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockScope
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockScope
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock

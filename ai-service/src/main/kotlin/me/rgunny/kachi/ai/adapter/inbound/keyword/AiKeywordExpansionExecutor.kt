@@ -2,8 +2,8 @@ package me.rgunny.kachi.ai.adapter.inbound.keyword
 
 import me.rgunny.kachi.ai.application.port.inbound.keyword.ExpandKeywordsUseCase
 import me.rgunny.kachi.ai.application.port.inbound.keyword.model.ExpandKeywordsCommand
-import me.rgunny.kachi.ai.application.port.outbound.lock.AiExecutionLock
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.AiExecutionLock
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
 import org.springframework.stereotype.Component
 

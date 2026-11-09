@@ -5,7 +5,7 @@ import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.ai.application.port.inbound.outbox.RelayAiOutboxUseCase
 import me.rgunny.kachi.ai.fake.BlockingRelayAiOutboxUseCase
 import me.rgunny.kachi.ai.fake.FailingRelayAiOutboxUseCase
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.fake.FakeExecutionLockPort
 import me.rgunny.kachi.ai.fake.RecordingRelayAiOutboxUseCase
 import me.rgunny.kachi.ai.fixture.AiTestFixture

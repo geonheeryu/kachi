@@ -1,4 +1,4 @@
-package me.rgunny.kachi.ai.application.port.outbound.lock
+package me.rgunny.kachi.collector.application.port.outbound.lock.model
 
 import java.time.Instant
 

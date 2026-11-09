@@ -2,8 +2,8 @@ package me.rgunny.kachi.ai.adapter.inbound.story
 
 import me.rgunny.kachi.ai.application.port.inbound.story.SummarizeDueStoriesUseCase
 import me.rgunny.kachi.ai.application.port.inbound.story.model.SummarizeDueStoriesCommand
-import me.rgunny.kachi.ai.application.port.outbound.lock.AiExecutionLock
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.AiExecutionLock
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
 import org.springframework.stereotype.Component
 
