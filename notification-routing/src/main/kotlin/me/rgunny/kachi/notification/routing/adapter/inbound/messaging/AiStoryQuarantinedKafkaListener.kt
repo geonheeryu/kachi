@@ -2,7 +2,7 @@ package me.rgunny.kachi.notification.routing.adapter.inbound.messaging
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.ai.contract.AiKeywordQuarantinedEvent
+import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.RouteQuarantineNotificationUseCase
 import me.rgunny.kachi.notification.routing.domain.RoutingJobKind
 import me.rgunny.kachi.notification.routing.adapter.monitoring.NotificationRoutingMetrics
@@ -14,18 +14,20 @@ import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 
 /**
- * ai.keyword.quarantined Kafka 인입 adapter.
- * 관리자 x 채널로 라우팅한다.
+ * ai.story.quarantined Kafka 인입 adapter.
+ *
+ * story 격리 계약을 읽어 routing command로 바꾸고, 관리자 x 채널 라우팅은 use case에 맡긴다.
+ * 읽을 수 없거나 command로 옮길 수 없는 payload는 InvalidAiEventMessageException으로 던진다.
  */
 @Component
-class AiKeywordQuarantinedKafkaListener(
+class AiStoryQuarantinedKafkaListener(
     private val routeQuarantineNotificationUseCase: RouteQuarantineNotificationUseCase,
     private val jsonMapper: JsonMapper,
     private val metrics: NotificationRoutingMetrics,
 ) {
 
     @KafkaListener(
-        topics = ["\${kachi.notification.routing.topics.keyword-quarantined}"],
+        topics = ["\${kachi.notification.routing.topics.story-quarantined}"],
         groupId = "\${kachi.notification.routing.group-id}",
         containerFactory = "notificationRoutingKafkaListenerContainerFactory",
         properties = ["auto.offset.reset=\${kachi.notification.routing.auto-offset-reset}"],
@@ -33,10 +35,10 @@ class AiKeywordQuarantinedKafkaListener(
     fun consume(@Payload payload: String) = runBlocking {
         val startedAt = System.nanoTime()
         val command = try {
-            AiKeywordQuarantinedEventMapper.toCommand(readEvent(payload))
+            AiStoryQuarantinedEventMapper.toCommand(readEvent(payload))
         } catch (exception: IllegalArgumentException) {
             metrics.recordInvalidRoutingMessage(RoutingJobKind.QUARANTINE, elapsed(startedAt))
-            throw InvalidAiEventMessageException("invalid ai keyword quarantined event", exception)
+            throw InvalidAiEventMessageException("invalid ai story quarantined event", exception)
         } catch (exception: InvalidAiEventMessageException) {
             metrics.recordInvalidRoutingMessage(RoutingJobKind.QUARANTINE, elapsed(startedAt))
             throw exception
@@ -53,22 +55,22 @@ class AiKeywordQuarantinedKafkaListener(
         metrics.recordRouting(RoutingJobKind.QUARANTINE, result, elapsed(startedAt))
 
         log.info(
-            "ai keyword quarantine routed eventKey={} outcome={} targets={} published={}",
+            "ai story quarantine routed eventKey={} outcome={} targets={} published={}",
             command.eventKey, result.outcome, result.targetCount, result.publishedCount,
         )
     }
 
-    private fun readEvent(payload: String): AiKeywordQuarantinedEvent {
+    private fun readEvent(payload: String): AiStoryQuarantinedEvent {
         return try {
-            jsonMapper.readValue(payload, AiKeywordQuarantinedEvent::class.java)
+            jsonMapper.readValue(payload, AiStoryQuarantinedEvent::class.java)
         } catch (exception: Exception) {
-            throw InvalidAiEventMessageException("invalid ai keyword quarantined payload", exception)
+            throw InvalidAiEventMessageException("invalid ai story quarantined payload", exception)
         }
     }
 
     private fun elapsed(startedAt: Long): Duration = Duration.ofNanos(System.nanoTime() - startedAt)
 
     private companion object {
-        val log = LoggerFactory.getLogger(AiKeywordQuarantinedKafkaListener::class.java)
+        val log = LoggerFactory.getLogger(AiStoryQuarantinedKafkaListener::class.java)
     }
 }

@@ -35,7 +35,7 @@ kachi:
       auto-offset-reset: earliest
       topics:
         summary-created: ai.summary.created
-        keyword-quarantined: ai.keyword.quarantined
+        story-quarantined: ai.story.quarantined
       dlt:
         topic: notification.routing.dlt
       retry:

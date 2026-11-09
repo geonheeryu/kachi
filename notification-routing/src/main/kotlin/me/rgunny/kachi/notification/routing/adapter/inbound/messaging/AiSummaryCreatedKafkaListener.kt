@@ -2,8 +2,9 @@ package me.rgunny.kachi.notification.routing.adapter.inbound.messaging
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.RouteSummaryNotificationUseCase
+import me.rgunny.kachi.notification.routing.application.service.RoutingEventKey
 import me.rgunny.kachi.notification.routing.domain.RoutingJobKind
 import me.rgunny.kachi.notification.routing.adapter.monitoring.NotificationRoutingMetrics
 import org.slf4j.LoggerFactory
@@ -16,7 +17,8 @@ import java.time.Duration
 /**
  * ai.summary.created Kafka 인입 adapter.
  *
- * 계약을 읽어 routing command로 바꾸고, 한 번만 라우팅하는 규칙과 접수는 core use case에 맡긴다.
+ * schemaVersion 2 story 요약 계약을 읽어 routing command로 바꾸고, 라우팅은 use case에 맡긴다.
+ * 읽을 수 없거나 command로 옮길 수 없는 payload는 InvalidAiEventMessageException으로 던진다.
  */
 @Component
 class AiSummaryCreatedKafkaListener(
@@ -55,13 +57,13 @@ class AiSummaryCreatedKafkaListener(
 
         log.info(
             "ai summary routed eventKey={} outcome={} targets={} published={}",
-            command.summaryId, result.outcome, result.targetCount, result.publishedCount,
+            RoutingEventKey.forSummary(command.storyId, command.version), result.outcome, result.targetCount, result.publishedCount,
         )
     }
 
-    private fun readEvent(payload: String): AiSummaryCreatedEvent {
+    private fun readEvent(payload: String): AiSummaryCreatedEventV2 {
         return try {
-            jsonMapper.readValue(payload, AiSummaryCreatedEvent::class.java)
+            jsonMapper.readValue(payload, AiSummaryCreatedEventV2::class.java)
         } catch (exception: Exception) {
             throw InvalidAiEventMessageException("invalid ai summary created payload", exception)
         }

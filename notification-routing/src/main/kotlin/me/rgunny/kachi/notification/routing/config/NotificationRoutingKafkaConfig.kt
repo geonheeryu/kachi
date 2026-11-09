@@ -16,7 +16,7 @@ import org.springframework.util.backoff.FixedBackOff
  *
  * 읽을 수 없는 payload나 지원하지 않는 schemaVersion은 다시 받아도 같으므로 즉시 DLT로 보낸다.
  * user-service·Mongo·접수 topic 발행 장애로 라우팅이 실패하면 짧게 재시도한 뒤 DLT로 보낸다.
- * 라우팅 도중 실패해도 RoutingJob이 STARTED로 남아 DLT 재발행 시 다시 발행되고, 접수 쪽 requestId 멱등이 중복을 거른다.
+ * 라우팅 도중 실패해도 RoutingJob이 STARTED로 남아 DLT 재발행 시 저장된 cursor부터 다시 발행되고, 접수 쪽 requestId 멱등이 중복을 거른다.
  */
 @Configuration
 class NotificationRoutingKafkaConfig {

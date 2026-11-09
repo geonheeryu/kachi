@@ -17,16 +17,16 @@ class RoutingJobDocumentMapperTest {
     @Test
     @DisplayName("RoutingJob과 document를 상호 변환할 때 상태와 카운트를 보존한다")
     fun roundTrip() {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", NOW)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", NOW)
             .complete(3, 3, NOW.plusSeconds(5))
 
         val document = mapper.toDocument(job)
         val restored = mapper.toDomain(document)
 
         assertEquals(job.id, restored.id)
-        assertEquals("summary-1", restored.eventKey)
+        assertEquals("story-1:1", restored.eventKey)
         assertEquals(RoutingJobKind.SUMMARY, restored.kind)
-        assertEquals("tesla", restored.keyword)
+        assertEquals("story-1", restored.storyId)
         assertEquals(RoutingJobStatus.COMPLETED, restored.status)
         assertNull(restored.cursor)
         assertEquals(3, restored.targetCount)
@@ -39,7 +39,7 @@ class RoutingJobDocumentMapperTest {
     @Test
     @DisplayName("STARTED job의 cursor를 보존한다")
     fun roundTripCursor() {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", NOW)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", NOW)
             .advance("cursor-1", targetDelta = 2, publishedDelta = 2, now = NOW.plusSeconds(1))
 
         val restored = mapper.toDomain(mapper.toDocument(job))

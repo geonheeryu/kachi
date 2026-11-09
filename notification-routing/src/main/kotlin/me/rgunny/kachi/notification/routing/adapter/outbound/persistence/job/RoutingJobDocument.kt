@@ -16,7 +16,7 @@ data class RoutingJobDocument(
     @Indexed(unique = true, name = "ux_routing_jobs_event_key")
     val eventKey: String,
     val kind: String,
-    val keyword: String,
+    val storyId: String,
     val status: String,
     val cursor: String?,
     val targetCount: Int,

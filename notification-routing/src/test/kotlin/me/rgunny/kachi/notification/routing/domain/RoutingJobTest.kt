@@ -18,9 +18,10 @@ class RoutingJobTest {
     @Test
     @DisplayName("start는 STARTED이고 cursor가 null이며 카운트가 0이다")
     fun start() {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
 
         assertEquals(RoutingJobStatus.STARTED, job.status)
+        assertEquals("story-1", job.storyId)
         assertNull(job.cursor)
         assertEquals(0, job.targetCount)
         assertEquals(0, job.publishedCount)
@@ -28,14 +29,14 @@ class RoutingJobTest {
         assertEquals(now, job.updatedAt)
         assertNull(job.completedAt)
 
-        assertFailsWith<IllegalArgumentException> { RoutingJob.start(" ", RoutingJobKind.SUMMARY, "tesla", now) }
-        assertFailsWith<IllegalArgumentException> { RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "", now) }
+        assertFailsWith<IllegalArgumentException> { RoutingJob.start(" ", RoutingJobKind.SUMMARY, "story-1", now) }
+        assertFailsWith<IllegalArgumentException> { RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "", now) }
     }
 
     @Test
     @DisplayName("advance는 cursor를 바꾸고 누계에 delta를 더하며 원본은 그대로다")
     fun advance() {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
 
         val first = job.advance(cursor = "cursor-1", targetDelta = 3, publishedDelta = 3, now = now.plusSeconds(1))
         val second = first.advance(cursor = "cursor-2", targetDelta = 0, publishedDelta = 0, now = now.plusSeconds(2))
@@ -63,7 +64,7 @@ class RoutingJobTest {
     @DisplayName("complete는 마지막 delta를 더하고 cursor를 null로 하며 원본은 그대로다")
     fun complete() {
         val completedAt = now.plusSeconds(5)
-        val advanced = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val advanced = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
             .advance("cursor-1", targetDelta = 3, publishedDelta = 3, now = now.plusSeconds(1))
 
         val completed = advanced.complete(targetDelta = 2, publishedDelta = 1, now = completedAt)
@@ -83,7 +84,7 @@ class RoutingJobTest {
     @Test
     @DisplayName("COMPLETED는 advance도 complete도 할 수 없다")
     fun rejectTransitionAfterCompleted() {
-        val completed = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val completed = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
             .complete(1, 1, now.plusSeconds(1))
 
         assertFailsWith<IllegalStateException> { completed.complete(1, 1, now.plusSeconds(2)) }
@@ -94,7 +95,7 @@ class RoutingJobTest {
     @CsvSource("-1, 0", "1, -1", "2, 3")
     @DisplayName("delta가 음수이거나 발행 delta가 대상 delta를 넘으면 advance도 complete도 할 수 없다")
     fun rejectInvalidDeltas(targetDelta: Int, publishedDelta: Int) {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
 
         assertFailsWith<IllegalArgumentException> {
             job.advance("cursor-1", targetDelta, publishedDelta, now.plusSeconds(1))
@@ -108,7 +109,7 @@ class RoutingJobTest {
     @ValueSource(strings = ["", " "])
     @DisplayName("advance의 cursor는 blank일 수 없다")
     fun rejectBlankCursor(cursor: String) {
-        val job = RoutingJob.start("summary-1", RoutingJobKind.SUMMARY, "tesla", now)
+        val job = RoutingJob.start("story-1:1", RoutingJobKind.SUMMARY, "story-1", now)
 
         assertFailsWith<IllegalArgumentException> { job.advance(cursor, 1, 1, now.plusSeconds(1)) }
     }
@@ -132,9 +133,9 @@ class RoutingJobTest {
     private fun restore(status: RoutingJobStatus, cursor: String?, completedAt: Instant?): RoutingJob {
         return RoutingJob.restore(
             id = RoutingJobId.newId(),
-            eventKey = "summary-1",
+            eventKey = "story-1:1",
             kind = RoutingJobKind.SUMMARY,
-            keyword = "tesla",
+            storyId = "story-1",
             status = status,
             cursor = cursor,
             targetCount = 0,

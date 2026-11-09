@@ -21,7 +21,7 @@ class NotificationRoutingPropertiesTest {
                 "kachi.notification.routing.request-topic" to "notification.requested",
                 "kachi.notification.routing.auto-offset-reset" to "earliest",
                 "kachi.notification.routing.topics.summary-created" to "ai.summary.created",
-                "kachi.notification.routing.topics.keyword-quarantined" to "ai.keyword.quarantined",
+                "kachi.notification.routing.topics.story-quarantined" to "ai.story.quarantined",
                 "kachi.notification.routing.dlt.topic" to "notification.routing.dlt",
                 "kachi.notification.routing.retry.max-attempts" to "3",
                 "kachi.notification.routing.retry.backoff" to "1s",
@@ -42,7 +42,7 @@ class NotificationRoutingPropertiesTest {
         assertEquals("notification.requested", properties.requestTopic)
         assertEquals("earliest", properties.autoOffsetReset)
         assertEquals("ai.summary.created", properties.topics.summaryCreated)
-        assertEquals("ai.keyword.quarantined", properties.topics.keywordQuarantined)
+        assertEquals("ai.story.quarantined", properties.topics.storyQuarantined)
         assertEquals("notification.routing.dlt", properties.dlt.topic)
         assertEquals(3, properties.retry.maxAttempts)
         assertEquals(Duration.ofSeconds(1), properties.retry.backoff)
@@ -61,7 +61,7 @@ class NotificationRoutingPropertiesTest {
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(requestTopic = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(autoOffsetReset = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(summaryCreatedTopic = "") }
-        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(keywordQuarantinedTopic = " ") }
+        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(storyQuarantinedTopic = " ") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(dltTopic = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(maxAttempts = 0) }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(backoff = Duration.ZERO) }

@@ -1,10 +1,10 @@
 package me.rgunny.kachi.notification.routing.support
 
+import me.rgunny.kachi.ai.contract.AiDevelopmentKind
 import me.rgunny.kachi.ai.contract.AiFailureReason
-import me.rgunny.kachi.ai.contract.AiKeywordQuarantinedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
+import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
 import me.rgunny.kachi.ai.contract.AiSummarySentiment
-import me.rgunny.kachi.ai.contract.AiTargetType
 import me.rgunny.kachi.notification.routing.config.NotificationRoutingProperties
 import java.time.Clock
 import java.time.Duration
@@ -25,7 +25,7 @@ object RoutingTestFixture {
         requestTopic: String = "notification.requested",
         autoOffsetReset: String = "earliest",
         summaryCreatedTopic: String = "ai.summary.created",
-        keywordQuarantinedTopic: String = "ai.keyword.quarantined",
+        storyQuarantinedTopic: String = "ai.story.quarantined",
         dltTopic: String = "notification.routing.dlt",
         maxAttempts: Long = 3,
         backoff: Duration = Duration.ofSeconds(1),
@@ -40,7 +40,7 @@ object RoutingTestFixture {
             groupId = groupId,
             requestTopic = requestTopic,
             autoOffsetReset = autoOffsetReset,
-            topics = NotificationRoutingProperties.Topics(summaryCreatedTopic, keywordQuarantinedTopic),
+            topics = NotificationRoutingProperties.Topics(summaryCreatedTopic, storyQuarantinedTopic),
             dlt = NotificationRoutingProperties.Dlt(dltTopic),
             retry = NotificationRoutingProperties.Retry(maxAttempts, backoff),
             userService = NotificationRoutingProperties.UserService(baseUrl, recipientsSearchPath, pageSize, usersPath, timeout, maxInMemorySize),
@@ -48,17 +48,22 @@ object RoutingTestFixture {
     }
 
     fun summaryCreatedEvent(
-        schemaVersion: Int = AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION,
+        schemaVersion: Int = AiSummaryCreatedEventV2.CURRENT_SCHEMA_VERSION,
         summaryId: String = "summary-1",
-        keyword: String = "tesla",
-        title: String = "Tesla opens new plant",
-        content: String = "Tesla announced a new plant.",
+        storyId: String = "story-1",
+        version: Long = 1,
+        keywords: List<String> = listOf("nvidia", "tsmc"),
+        title: String = "NVIDIA and TSMC expand partnership",
+        content: String = "NVIDIA and TSMC announced a new plant.",
         sourceNewsCount: Int = 3,
-    ): AiSummaryCreatedEvent {
-        return AiSummaryCreatedEvent(
+    ): AiSummaryCreatedEventV2 {
+        return AiSummaryCreatedEventV2(
             schemaVersion = schemaVersion,
             summaryId = summaryId,
-            keyword = keyword,
+            storyId = storyId,
+            version = version,
+            keywords = keywords,
+            developmentKind = AiDevelopmentKind.DEVELOPMENT,
             title = title,
             content = content,
             sentiment = AiSummarySentiment.POSITIVE,
@@ -70,16 +75,15 @@ object RoutingTestFixture {
         )
     }
 
-    fun keywordQuarantinedEvent(
-        schemaVersion: Int = AiKeywordQuarantinedEvent.CURRENT_SCHEMA_VERSION,
+    fun storyQuarantinedEvent(
+        schemaVersion: Int = AiStoryQuarantinedEvent.CURRENT_SCHEMA_VERSION,
         quarantineId: String = "quarantine-1",
-        keyword: String = "tesla",
-    ): AiKeywordQuarantinedEvent {
-        return AiKeywordQuarantinedEvent(
+        storyId: String = "story-1",
+    ): AiStoryQuarantinedEvent {
+        return AiStoryQuarantinedEvent(
             schemaVersion = schemaVersion,
             quarantineId = quarantineId,
-            targetType = AiTargetType.NEWS_SUMMARY,
-            keyword = keyword,
+            storyId = storyId,
             consecutiveFailures = 3,
             lastFailureReason = AiFailureReason.INVALID_RESPONSE,
             quarantinedAt = NOW,
@@ -88,11 +92,14 @@ object RoutingTestFixture {
 
     const val SUMMARY_CREATED_JSON = """
         {
-          "schemaVersion": 1,
+          "schemaVersion": 2,
           "summaryId": "summary-1",
-          "keyword": "tesla",
-          "title": "Tesla opens new plant",
-          "content": "Tesla announced a new plant.",
+          "storyId": "story-1",
+          "version": 1,
+          "keywords": ["nvidia", "tsmc"],
+          "developmentKind": "DEVELOPMENT",
+          "title": "NVIDIA and TSMC expand partnership",
+          "content": "NVIDIA and TSMC announced a new plant.",
           "sentiment": "POSITIVE",
           "sourceNewsCount": 3,
           "provider": "groq",
@@ -102,12 +109,11 @@ object RoutingTestFixture {
         }
     """
 
-    const val KEYWORD_QUARANTINED_JSON = """
+    const val STORY_QUARANTINED_JSON = """
         {
           "schemaVersion": 1,
           "quarantineId": "quarantine-1",
-          "targetType": "NEWS_SUMMARY",
-          "keyword": "tesla",
+          "storyId": "story-1",
           "consecutiveFailures": 3,
           "lastFailureReason": "INVALID_RESPONSE",
           "quarantinedAt": "2026-06-13T00:00:00Z"

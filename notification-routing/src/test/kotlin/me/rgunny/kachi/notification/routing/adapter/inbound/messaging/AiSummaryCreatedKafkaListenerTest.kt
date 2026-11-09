@@ -11,6 +11,8 @@ import me.rgunny.kachi.notification.routing.adapter.monitoring.NotificationRouti
 import me.rgunny.kachi.notification.routing.support.RoutingTestFixture
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import tools.jackson.databind.json.JsonMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,7 +37,9 @@ class AiSummaryCreatedKafkaListenerTest {
         val command = useCase.lastCommand
         requireNotNull(command)
         assertEquals("summary-1", command.summaryId)
-        assertEquals("tesla", command.keyword)
+        assertEquals("story-1", command.storyId)
+        assertEquals(1, command.version)
+        assertEquals(listOf("nvidia", "tsmc"), command.keywords)
         assertCounter("SUMMARY", "routed")
     }
 
@@ -48,11 +52,25 @@ class AiSummaryCreatedKafkaListenerTest {
         assertCounter("SUMMARY", "invalid")
     }
 
-    @Test
-    @DisplayName("지원하지 않는 schemaVersion은 invalid ai event 예외로 분류한다")
-    fun rejectUnsupportedSchemaVersion() {
+    @ParameterizedTest
+    @ValueSource(ints = [1, 3])
+    @DisplayName("schemaVersion이 2가 아니면 invalid ai event 예외로 분류한다")
+    fun rejectUnsupportedSchemaVersion(schemaVersion: Int) {
         assertFailsWith<InvalidAiEventMessageException> {
-            listener.consume(RoutingTestFixture.SUMMARY_CREATED_JSON.replace("\"schemaVersion\": 1", "\"schemaVersion\": 999"))
+            listener.consume(RoutingTestFixture.SUMMARY_CREATED_JSON.replace("\"schemaVersion\": 2", "\"schemaVersion\": $schemaVersion"))
+        }
+
+        assertNull(useCase.lastCommand)
+        assertCounter("SUMMARY", "invalid")
+    }
+
+    @Test
+    @DisplayName("keywords가 100개를 넘으면 invalid ai event 예외로 분류한다")
+    fun rejectTooManyKeywords() {
+        val keywords = (1..101).joinToString(", ") { "\"k$it\"" }
+
+        assertFailsWith<InvalidAiEventMessageException> {
+            listener.consume(RoutingTestFixture.SUMMARY_CREATED_JSON.replace("[\"nvidia\", \"tsmc\"]", "[$keywords]"))
         }
 
         assertNull(useCase.lastCommand)

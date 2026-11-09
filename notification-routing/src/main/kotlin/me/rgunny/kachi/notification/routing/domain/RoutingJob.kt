@@ -6,6 +6,7 @@ import java.time.Instant
  * 이벤트 1건을 라우팅한 기록 Aggregate Root.
  *
  * eventKey가 유일하므로 같은 이벤트를 두 번 받아도 job은 하나다.
+ * storyId는 요약이면 요약된 story, 격리면 격리된 story의 id다.
  * COMPLETED면 다시 라우팅하지 않고, STARTED면 cursor부터 이어서 발행한다.
  * cursor는 다음에 읽을 수신자 페이지의 위치이고, STARTED에서 null이면 첫 페이지부터, COMPLETED에서는 항상 null이다.
  * targetCount와 publishedCount는 끝낸 페이지들의 누계이고, publishedCount는 접수 topic으로 발행한 건수다.
@@ -14,7 +15,7 @@ class RoutingJob private constructor(
     val id: RoutingJobId,
     val eventKey: String,
     val kind: RoutingJobKind,
-    val keyword: String,
+    val storyId: String,
     val status: RoutingJobStatus,
     val cursor: String?,
     val targetCount: Int,
@@ -28,17 +29,17 @@ class RoutingJob private constructor(
         fun start(
             eventKey: String,
             kind: RoutingJobKind,
-            keyword: String,
+            storyId: String,
             now: Instant,
         ): RoutingJob {
             require(eventKey.isNotBlank()) { "eventKey must not be blank" }
-            require(keyword.isNotBlank()) { "keyword must not be blank" }
+            require(storyId.isNotBlank()) { "storyId must not be blank" }
 
             return RoutingJob(
                 id = RoutingJobId.newId(),
                 eventKey = eventKey,
                 kind = kind,
-                keyword = keyword,
+                storyId = storyId,
                 status = RoutingJobStatus.STARTED,
                 cursor = null,
                 targetCount = 0,
@@ -53,7 +54,7 @@ class RoutingJob private constructor(
             id: RoutingJobId,
             eventKey: String,
             kind: RoutingJobKind,
-            keyword: String,
+            storyId: String,
             status: RoutingJobStatus,
             cursor: String?,
             targetCount: Int,
@@ -63,7 +64,7 @@ class RoutingJob private constructor(
             completedAt: Instant?,
         ): RoutingJob {
             require(eventKey.isNotBlank()) { "eventKey must not be blank" }
-            require(keyword.isNotBlank()) { "keyword must not be blank" }
+            require(storyId.isNotBlank()) { "storyId must not be blank" }
             require(cursor == null || cursor.isNotBlank()) { "cursor must not be blank" }
             requireCounts(targetCount, publishedCount)
             require((status == RoutingJobStatus.COMPLETED) == (completedAt != null)) {
@@ -77,7 +78,7 @@ class RoutingJob private constructor(
                 id = id,
                 eventKey = eventKey,
                 kind = kind,
-                keyword = keyword,
+                storyId = storyId,
                 status = status,
                 cursor = cursor,
                 targetCount = targetCount,
@@ -162,7 +163,7 @@ class RoutingJob private constructor(
             id = id,
             eventKey = eventKey,
             kind = kind,
-            keyword = keyword,
+            storyId = storyId,
             status = status,
             cursor = cursor,
             targetCount = targetCount,

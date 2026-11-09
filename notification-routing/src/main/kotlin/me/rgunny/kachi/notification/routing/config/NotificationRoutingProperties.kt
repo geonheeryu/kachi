@@ -35,11 +35,11 @@ data class NotificationRoutingProperties(
 
     data class Topics(
         val summaryCreated: String,
-        val keywordQuarantined: String,
+        val storyQuarantined: String,
     ) {
         init {
             require(summaryCreated.isNotBlank()) { "summary-created topic은 비어 있을 수 없습니다" }
-            require(keywordQuarantined.isNotBlank()) { "keyword-quarantined topic은 비어 있을 수 없습니다" }
+            require(storyQuarantined.isNotBlank()) { "story-quarantined topic은 비어 있을 수 없습니다" }
         }
     }
 
