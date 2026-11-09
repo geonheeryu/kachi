@@ -54,6 +54,23 @@ class NotificationMongoPersistenceAdapterIntegrationTest : PersistenceAdapterInt
             assertNotNull(adapter.findById(notification.id))
             assertEquals(notification.id, adapter.findByRequestId("request-1")?.id)
         }
+
+        @Test
+        @DisplayName("story 출처의 storyId·version·keywords를 저장하고 복원한다")
+        fun saveAndFindStoryOrigin() = runBlocking {
+            val origin = NotificationOrigin(
+                summaryId = "summary-1",
+                storyId = "story-1",
+                version = 2,
+                keywords = listOf("tesla", "nvidia"),
+                userId = "user-1",
+            )
+            val notification = notification(origin = origin)
+
+            adapter.save(notification)
+
+            assertEquals(origin, adapter.findById(notification.id)?.origin)
+        }
     }
 
     @Nested
@@ -124,14 +141,14 @@ class NotificationMongoPersistenceAdapterIntegrationTest : PersistenceAdapterInt
             .block() ?: emptyList()
     }
 
-    private fun notification(): Notification {
+    private fun notification(origin: NotificationOrigin = NotificationOrigin.NONE): Notification {
         return Notification.request(
             requestId = "request-1",
             requester = "collector-service",
             channel = NotificationChannel.SLACK,
             recipientId = "user-1",
             message = "hello",
-            origin = NotificationOrigin.NONE,
+            origin = origin,
             now = requestedAt,
         )
     }

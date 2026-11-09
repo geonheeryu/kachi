@@ -17,5 +17,11 @@ object NotificationTestFixture {
     const val RECIPIENT_ID = "user-1"
     const val MESSAGE = "hello"
     const val DISPATCH_TOPIC = "notification.dispatch"
-    val ORIGIN = NotificationOrigin(summaryId = "summary-1", keyword = "tesla", userId = "user-1")
+    val ORIGIN = NotificationOrigin(
+        summaryId = "summary-1",
+        storyId = "story-1",
+        version = 1,
+        keywords = listOf("tesla"),
+        userId = "user-1",
+    )
 }
