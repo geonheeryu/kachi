@@ -6,7 +6,7 @@ plugins {
     id("io.spring.dependency-management")
 }
 
-description = "서비스 다섯 개를 컨테이너로 띄워 구독 -> 요약 -> 라우팅 -> 발송 사이클을 끝까지 확인하는 e2e 테스트 (ADR 029)"
+description = "서비스 일곱 개를 컨테이너로 띄워 수집 -> story 조립 -> 요약 -> 라우팅 -> 발송 사이클을 끝까지 확인하는 e2e 테스트 (ADR 029)"
 
 java {
     toolchain {
@@ -17,6 +17,8 @@ java {
 // 실행할 서비스 모듈. 이 모듈은 각 모듈의 bootJar만 소비하고, 어느 모듈도 이 모듈에 의존하지 않는다.
 val serviceModules = listOf(
     "user-service",
+    "collector-service",
+    "story-service",
     "ai-service",
     "notification-routing",
     "notification-service",
@@ -25,6 +27,7 @@ val serviceModules = listOf(
 
 dependencies {
     // 계약 타입으로 broker 레코드를 읽고 쓴다.
+    testImplementation(project(":story-contract"))
     testImplementation(project(":ai-contract"))
     testImplementation(project(":notification-contract"))
 
@@ -49,11 +52,11 @@ dependencies {
 tasks.bootJar { enabled = false }
 tasks.jar { enabled = false }
 
-// 평소의 `./gradlew test`에는 끼지 않는다. 컨테이너 아홉 개를 띄우는 데 몇 분이 걸려 커밋마다 도는 루프와 맞지 않는다(ADR 029).
+// 평소의 `./gradlew test`에는 끼지 않는다. 컨테이너 열두 개를 띄우는 데 몇 분이 걸려 커밋마다 도는 루프와 맞지 않는다(ADR 029).
 tasks.test { enabled = false }
 
 tasks.register<Test>("e2eTest") {
-    description = "서비스 컨테이너 다섯 개로 전체 알림 사이클을 돈다. Docker가 필요하다."
+    description = "서비스 컨테이너 일곱 개로 수집부터 발송까지 전체 사이클을 돈다. Docker가 필요하다."
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath

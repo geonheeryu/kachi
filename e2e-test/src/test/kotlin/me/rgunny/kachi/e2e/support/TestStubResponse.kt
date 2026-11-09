@@ -5,6 +5,7 @@ package me.rgunny.kachi.e2e.support
  */
 data class TestStubResponse(
     val statusCode: Int,
-    val headers: Map<String, String> = emptyMap(),
-    val body: String
+    val body: String,
+    val contentType: String = "application/json",
+    val headers: Map<String, String> = emptyMap()
 )

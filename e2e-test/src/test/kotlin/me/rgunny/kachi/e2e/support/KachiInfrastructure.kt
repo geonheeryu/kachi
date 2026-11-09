@@ -10,9 +10,9 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * 서비스 컨테이너들이 공유하는 인프라 네 개(MySQL, Mongo replica set, Redis, Kafka)와 Docker network.
+ * 서비스 컨테이너들이 공유하는 인프라 다섯 개(MySQL, Mongo replica set, Redis, Kafka, Qdrant)와 Docker network.
  *
- * 서비스는 network alias(`mysql`·`mongo`·`redis`·`kafka`)로 붙고, 테스트 JVM은 host에 매핑된 포트로 붙는다.
+ * 서비스는 network alias(`mysql`·`mongo`·`redis`·`kafka`·`qdrant`)로 붙고, 테스트 JVM은 host에 매핑된 포트로 붙는다.
  * Mongo는 alias를 멤버 host로 replica set을 직접 초기화한다. 로컬 compose(`infra/docker-compose.mongo.yml`)와 같은 모양이다.
  */
 class KachiInfrastructure : AutoCloseable {
@@ -44,8 +44,15 @@ class KachiInfrastructure : AutoCloseable {
         // 컨테이너 안의 서비스가 alias로 붙는 listener. 테스트 JVM은 bootstrapServers(host 매핑)로 붙는다.
         .withListener("$KAFKA_ALIAS:$KAFKA_INTERNAL_PORT")
 
+    // story-service 통합 테스트와 로컬 compose의 이미지
+    val qdrant: GenericContainer<*> = GenericContainer("qdrant/qdrant:v1.19.1")
+        .withExposedPorts(QDRANT_HTTP_PORT, QDRANT_GRPC_PORT)
+        .withNetwork(network)
+        .withNetworkAliases(QDRANT_ALIAS)
+        .waitingFor(Wait.forHttp("/readyz").forPort(QDRANT_HTTP_PORT).forStatusCode(200))
+
     fun start() {
-        Startables.deepStart(mysql, mongo, redis, kafka).join()
+        Startables.deepStart(mysql, mongo, redis, kafka, qdrant).join()
         initiateReplicaSet()
     }
 
@@ -70,7 +77,7 @@ class KachiInfrastructure : AutoCloseable {
     }
 
     override fun close() {
-        listOf(kafka, redis, mongo, mysql).forEach { it.stop() }
+        listOf(qdrant, kafka, redis, mongo, mysql).forEach { it.stop() }
         network.close()
     }
 
@@ -100,5 +107,8 @@ class KachiInfrastructure : AutoCloseable {
         const val REDIS_PORT = 6379
         const val KAFKA_ALIAS = "kafka"
         const val KAFKA_INTERNAL_PORT = 19092
+        const val QDRANT_ALIAS = "qdrant"
+        const val QDRANT_HTTP_PORT = 6333
+        const val QDRANT_GRPC_PORT = 6334
     }
 }

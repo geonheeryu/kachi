@@ -56,8 +56,9 @@ class KafkaSupport(private val bootstrapServers: String) {
 
     companion object {
         val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(60)
+        const val TOPIC_STORY_ARTICLE_ATTACHED = "story.article.attached"
         const val TOPIC_SUMMARY_CREATED = "ai.summary.created"
-        const val TOPIC_KEYWORD_QUARANTINED = "ai.keyword.quarantined"
+        const val TOPIC_STORY_QUARANTINED = "ai.story.quarantined"
         const val TOPIC_NOTIFICATION_REQUESTED = "notification.requested"
     }
 }
