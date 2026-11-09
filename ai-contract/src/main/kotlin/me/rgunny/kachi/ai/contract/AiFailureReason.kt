@@ -11,6 +11,5 @@ enum class AiFailureReason {
     NETWORK_ERROR,
     INVALID_RESPONSE,
     PROVIDER_UNAVAILABLE,
-    EMPTY_INPUT,
     UNKNOWN
 }

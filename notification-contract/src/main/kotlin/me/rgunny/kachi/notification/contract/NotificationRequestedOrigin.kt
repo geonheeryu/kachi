@@ -10,7 +10,6 @@ package me.rgunny.kachi.notification.contract
  * @property storyId 요약이 속한 story 식별자.
  * @property version [storyId] story의 요약 버전.
  * @property keywords story의 키워드 중 수신자가 구독한 canonicalKey 목록(없으면 빈 목록).
- * @property keyword 요청을 만든 키워드 하나.
  * @property userId 알림을 받는 사용자 식별자.
  */
 data class NotificationRequestedOrigin(
@@ -18,6 +17,5 @@ data class NotificationRequestedOrigin(
     val storyId: String? = null,
     val version: Long? = null,
     val keywords: List<String> = emptyList(),
-    val keyword: String? = null,
     val userId: String? = null,
 )
