@@ -14,8 +14,9 @@ Kachi의 현재 구현은 다음 상태다.
 user-service
   -> ai-service keyword expansion
       -> collector-service collection
-          -> ai-service news summary
-              -> notification-service
+          -> story-service assembly
+              -> ai-service story summary
+                  -> notification-routing
 ```
 
 현재 `user-service`의 활성 키워드 internal API는 keyword 이름만 제공한다.
@@ -24,24 +25,27 @@ user-service
 
 ## 결정
 
-초기 `ai-service`는 키워드 단위 AI 처리 서비스로 설계한다.
+`ai-service`는 키워드 확장과 story 요약을 LLM으로 처리하는 서비스다.
 
 핵심 유스케이스는 다음 두 가지다.
 
 - `ExpandKeywordsUseCase`: 원본 키워드 목록을 LLM으로 확장한다.
-- `SummarizeNewsUseCase`: 키워드별 뉴스 묶음을 LLM으로 요약한다.
+- `SummarizeStoryUseCase`: story의 미요약 기사를 직전 버전 요약과 함께 LLM으로 요약해 다음 버전을 만든다(ADR 034).
 
-실행 기록은 `AiRun` aggregate로 분리한다.
-키워드 확장 결과와 뉴스 요약 결과는 각각 `KeywordExpansion`, `NewsSummary` aggregate로 저장한다.
+키워드 확장의 실행 기록은 `AiRun` aggregate로 분리한다.
+키워드 확장 결과와 story 요약 버전은 각각 `KeywordExpansion`, `StorySummary` aggregate로 저장한다.
 
 ```text
 Internal API 또는 Scheduler
-  -> AiExecutionExecutor
-      -> ExpandKeywordsUseCase / SummarizeNewsUseCase
+  -> AiKeywordExpansionExecutor / AiStorySummaryExecutor
+      -> ExpandKeywordsUseCase / SummarizeDueStoriesUseCase
           -> KeywordReaderPort
-          -> NewsReaderPort
           -> LlmProviderPort
           -> PersistencePort
+
+story.article.attached · story.merged 소비
+  -> RecordStoryArticleUseCase / ApplyStoryMergeUseCase
+      -> SummarizeStoryUseCase
 ```
 
 `ai-service`는 Kotlin, Spring WebFlux, reactive MongoDB를 사용한다.
@@ -52,7 +56,7 @@ Internal API 또는 Scheduler
 ### ai-service가 소유하는 것
 
 - 키워드 확장 결과
-- 뉴스 요약 결과
+- story 요약 버전
 - AI 실행 기록
 - LLM provider/model/prompt version/token usage 메타데이터
 - LLM 응답 파싱과 검증 규칙
@@ -79,30 +83,17 @@ GET /api/v1/internal/keywords/active
 
 초기 계약은 keyword 이름만 포함하므로 AI 처리도 keyword 이름 단위로 수행한다.
 
-### collector-service
+### story-service
 
-요약 대상 뉴스를 읽기 위한 internal API를 사용한다.
-
-```text
-GET /api/v1/internal/news?keyword={keyword}&from={from}&to={to}&limit={limit}
-```
-
-응답은 AI 요약 입력에 필요한 최소 필드만 제공한다.
-
-- `id`
-- `source`
-- `title`
-- `url`
-- `publishedAt`
-- `collectedAt`
-- `matchedKeywords`
+요약할 story와 기사는 story-service의 이벤트(`story.article.attached`, `story.merged`)가 실어 온 값으로 받는다(ADR 034).
+ai-service는 collector-service와 story-service의 API를 호출하지 않는다.
 
 ## 실행 모델
 
 `collector-service`의 실행 모델과 동일하게 scheduler와 internal API를 둘 다 지원한다.
 
-- scheduler: 주기적 뉴스 요약 생성
-- internal API: 수동 키워드 확장 또는 수동 뉴스 요약
+- scheduler: 주기 키워드 확장, 대기 상한을 넘긴 story의 요약 tick
+- internal API: 수동 키워드 확장 또는 수동 story 요약 tick
 
 중복 실행 방지는 application service가 아니라 `adapter.in`의 `AiExecutionExecutor`가 담당한다.
 초기에는 단일 인스턴스를 가정하고 JVM 내부 lock을 사용한다.
@@ -113,7 +104,7 @@ GET /api/v1/internal/news?keyword={keyword}&from={from}&to={to}&limit={limit}
 LLM 연동은 `LlmProviderPort` 뒤에 둔다. application 서비스는 포트만 부르고 어느 제공자의 어느 모델이 응답하는지 모른다.
 
 ```text
-SummarizeNewsService / ExpandKeywordsService
+SummarizeStoryService / ExpandKeywordsService
   -> LlmProviderPort
       -> 용도별 후보 모델 (API 규격별 adapter)
 ```
@@ -131,17 +122,10 @@ LLM 응답은 adapter에서 raw response DTO로 받고, application service에�
 MongoDB collection은 다음을 사용한다.
 
 - `keyword_expansions`
-- `news_summaries`
+- `stories`, `story_articles`, `story_summaries`
 - `ai_runs`
 
-요약 중복 방지를 위해 `news_summaries`에는 다음 기준의 unique index를 둔다.
-
-```text
-keyword + newsHash + promptVersion + model
-```
-
-`newsHash`는 요약 대상 뉴스 id 목록, 기간, 키워드를 기준으로 계산한다.
-같은 키워드라도 뉴스 묶음이나 prompt/model이 바뀌면 새 요약으로 저장할 수 있게 한다.
+story 요약 버전의 중복은 `story_summaries`의 `(storyId, version)` unique index가 막는다(ADR 034).
 
 키워드 확장 중복 방지를 위해 `keyword_expansions`에는 다음 기준의 unique index를 둔다.
 
@@ -162,7 +146,6 @@ AI 작업은 provider 실패 하나로 애플리케이션 전체를 중단하지
 - `SERVER_ERROR`
 - `NETWORK_ERROR`
 - `INVALID_RESPONSE`
-- `EMPTY_INPUT`
 - `UNKNOWN`
 
 retry, backoff, 서킷 브레이커, token budget 최적화는 전체 파이프라인 구성 이후 고도화한다.
@@ -170,18 +153,15 @@ retry, backoff, 서킷 브레이커, token budget 최적화는 전체 파이프�
 ## 결과
 
 - `ai-service`는 user/collector DB에 직접 접근하지 않고 명시적 internal API 계약으로 연결된다.
-- 초기 구현은 현재 keyword-only 계약에 맞춰 키워드 단위로 동작한다.
+- 키워드 확장은 키워드 단위, 요약은 story 단위로 동작한다(ADR 031).
 - 사용자별 개인화는 나중에 user-service internal API가 user id 또는 keyword id를 제공할 때 확장한다.
 - 실행 기록과 결과 저장이 분리되어 실패 분석, 재시도, notification 연계가 쉬워진다.
 - collector-service와 같은 실행 모델을 사용해 코드 구조와 테스트 전략을 재사용할 수 있다.
 
 ## 제외한 것
 
-현재는 Kafka 이벤트 기반 처리를 도입하지 않는다.
-서비스 파이프라인의 기본 API 계약과 저장 모델을 먼저 완성한 뒤, 이벤트 기반 비동기화가 필요한 지점을 별도 결정으로 다룬다.
-
-현재는 embedding/vector search를 도입하지 않는다.
-초기 요약은 기간과 키워드로 조회한 뉴스 묶음을 대상으로 생성한다.
+ai-service는 embedding/vector search를 하지 않는다.
+기사를 사건 단위로 묶는 일은 story-service가 한다(ADR 031).
 
 현재는 프롬프트 전문을 장기 저장하지 않는다.
 대신 prompt version, model, provider, token usage를 저장한다.

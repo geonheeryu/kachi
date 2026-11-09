@@ -109,8 +109,7 @@ relay만 켜고 어댑터가 없으면 기동에 실패한다. 테스트 프로�
 
 ### 조회 API
 
-`GET /api/v1/internal/news`는 그대로 두고 응답에 `excerpt`·`language`를 더한다.
-ai-service가 story 경로로 옮겨 가면(ADR 035) 이 API는 지운다.
+collector에는 기사 기간 조회 API(`GET /api/v1/internal/news`)가 없다. 소비자는 기사를 이 이벤트로만 받는다(ADR 035).
 
 ## 검토한 대안
 
@@ -136,12 +135,10 @@ ai-service가 story 경로로 옮겨 가면(ADR 035) 이 API는 지운다.
 
 - Mongo가 replica set이 아니면 저장이 트랜잭션 오류로 실패한다.
 - relay를 끈 채 쌓인 PENDING은 켜는 즉시 batch 50건씩 발행된다. 오래된 기사가 한꺼번에 나가는 것이 원치 않는 결과면 켜기 전에 outbox 조회 API로 양을 본다.
-- ai-service의 조회 API 소비는 story 경로로 옮겨 갈 때까지(ADR 035) 유지된다. 응답 필드 추가는 소비자에게 영향이 없다.
 
 ## 후속
 
 - ADR 033: story-service가 이 이벤트를 소비해 조립한다.
-- ADR 035: ai-service의 조회 API 소비를 끊고 `GET /api/v1/internal/news`를 지운다.
 
 ## 출처
 

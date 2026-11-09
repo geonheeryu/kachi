@@ -33,7 +33,7 @@ Kachi는 사용자가 등록한 관심 키워드를 기준으로 뉴스와 시�
 | `user-service` | Kotlin | Spring MVC | MySQL | 사용자 인증, 사용자 상태, 키워드 구독, 채널 바인딩 관리 |
 | `collector-service` | Kotlin | WebFlux | MongoDB | 뉴스/시장 데이터 수집 |
 | `story-service` | Kotlin | WebFlux | MongoDB, Qdrant | 기사를 같은 사건 단위 story로 조립, story 이벤트 발행 |
-| `ai-service` | Kotlin | WebFlux | MongoDB | 키워드 확장, 뉴스 요약 |
+| `ai-service` | Kotlin | WebFlux | MongoDB | 키워드 확장, story 요약 |
 | `notification-service` | Kotlin | WebFlux | MongoDB, Redis, Kafka | 알림 요청 접수, outbox 발행, Slack/Discord/Telegram 발송 |
 | `history-service` | Java | Spring Batch | MySQL | 사용자 활동/알림/요약 이력 적재 및 통계 집계 |
 
@@ -46,12 +46,11 @@ user-service
   └─ 키워드 구독·채널 바인딩 등록/관리
       -> collector-service: 활성 키워드 조회(HTTP internal) 후 뉴스 수집, `collector.news.collected` 발행
           -> story-service: 기사를 같은 사건 단위 story로 조립, `story.article.attached`·`story.merged` 발행
-              -> ai-service: story 이벤트를 받아 story 단위로 요약 버전 생성
-          -> ai-service: 수집 뉴스를 키워드별로 LLM 요약 (newsHash 중복 방지), `ai.summary.created`·`ai.keyword.quarantined` 발행
-              -> notification-routing: ai 이벤트를 구독자·관리자 x 채널로 fan-out해 `notification.requested` 발행
-              -> notification-service: 알림 접수, outbox 발행
-                  -> notification-worker: Slack/Discord/Telegram 발송
-                      -> history-service: 이력 적재 / 통계 집계 (미구현)
+              -> ai-service: story 이벤트를 받아 LLM으로 요약 버전 생성, `ai.summary.created`·`ai.story.quarantined` 발행
+                  -> notification-routing: 구독 수신자·관리자 x 채널로 fan-out해 `notification.requested` 발행
+                      -> notification-service: 알림 접수, outbox 발행
+                          -> notification-worker: Slack/Discord/Telegram 발송
+                              -> history-service: 이력 적재 / 통계 집계 (미구현)
 ```
 
 서비스 간 경계와 전체 데이터 흐름은 [도메인모델.md의 컨텍스트 맵](./docs/도메인모델.md)을
@@ -69,8 +68,8 @@ user-service
 | `user-service` | 사용자, canonical 키워드·구독, 채널 바인딩(암호화 주소, Telegram 연결 링크), 활성 키워드·구독·바인딩 internal API, OAuth2/JWT, refresh token, MySQL/Redis 저장소 구현 | [user-service README](./user-service/README.md) |
 | `collector-service` | 뉴스 도메인, Google/Naver/Finnhub provider, user-service 키워드 조회, MongoDB 저장, scheduler/internal API 실행 진입점, 기사 outbox 기록과 relay의 `collector.news.collected` 발행(`collector-contract` 모듈) 구현 | [collector-service README](./collector-service/README.md) |
 | `story-service` | story·기사 사본·판정 기록 도메인, TEI 임베딩·판정기 adapter와 서킷, Qdrant gRPC 후보 색인, `collector.news.collected` 소비와 2단계 판정 조립, 닫기·병합·색인 정리 주기 작업, 조회·병합·분리·색인 재구축·outbox 운영 internal API, outbox relay의 `story.article.attached`/`story.merged` 발행(`story-contract` 모듈) 구현 | [story-service README](./story-service/README.md) |
-| `ai-service` | 뉴스 요약 실행 구현: 키워드별 LLM 요약, newsHash 중복 방지, AiRun 실행 기록, 용도별 후보 모델(enum)과 모델 단위 서킷·cooldown·hold, 순차 failover, 실패의 책임·지속 분류와 전 후보 합의 격리, 코드에 둔 프롬프트 버전, `src/realTest` 실호출 검증, MongoDB 저장, 요약/격리 이벤트 outbox 기록과 relay, `ai.summary.created`/`ai.keyword.quarantined` Kafka 발행(`ai-contract` 모듈), scheduler/internal API 진입점, 격리·watermark·outbox 운영 internal API, LLM 모델 상태·reset·probe internal API. story 요약 구현: `story.article.attached`/`story.merged` 소비, story·기사 사본, `(storyId, version)` 요약 버전, story 격리, story 요약·격리 internal API | [ai-service README](./ai-service/README.md) |
-| `notification-service` | notification-routing/core/service/worker/contract 모듈 구성, `ai.summary.created`·`ai.keyword.quarantined` 소비와 구독자 x 채널 fan-out(`notification.requested` 발행, RoutingJob 멱등), 요청 접수, MongoDB outbox, Kafka dispatch 발행, worker dispatch, mock/Slack/Discord/Telegram sender, retry/DLT 영속화와 운영 조회/폐기, stale PUBLISHING/PROCESSING 회수, DEAD 운영 조회/수동 복구 구현 | [notification 종합 문서](./docs/README-notification.md) |
+| `ai-service` | story 요약 구현: `story.article.attached`/`story.merged` 소비, story·기사 사본, `(storyId, version)` 요약 버전, 미요약 수 즉시 트리거와 대기 상한 tick, story 격리, 요약/분리 요청/격리 이벤트 outbox 기록과 relay의 `ai.summary.created`/`ai.story.split-requested`/`ai.story.quarantined` Kafka 발행(`ai-contract` 모듈). 공통: 키워드 확장과 AiRun 실행 기록, 용도별 후보 모델(enum)과 모델 단위 서킷·cooldown·hold, 순차 failover, 실패의 책임·지속 분류와 전 후보 합의 격리, 코드에 둔 프롬프트 버전, `src/realTest` 실호출 검증, story 요약·격리·outbox 운영 internal API, LLM 모델 상태·reset·probe internal API | [ai-service README](./ai-service/README.md) | [ai-service README](./ai-service/README.md) |
+| `notification-service` | notification-routing/core/service/worker/contract 모듈 구성, `ai.summary.created`·`ai.story.quarantined` 소비와 구독 수신자 x 채널 fan-out(`notification.requested` 발행, storyId·version 멱등과 진행 커서), 요청 접수, MongoDB outbox, Kafka dispatch 발행, worker dispatch, mock/Slack/Discord/Telegram sender, retry/DLT 영속화와 운영 조회/폐기, stale PUBLISHING/PROCESSING 회수, DEAD 운영 조회/수동 복구 구현 | [notification 종합 문서](./docs/README-notification.md) |
 | `history-service` | 미구현 | - |
 
 ---
@@ -215,8 +214,8 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 | [007. user-service 운영성 기본 설정](./docs/decisions/007-user-service-운영성-기본설정.md) | health endpoint, graceful shutdown 기본 설정 |
 | [008. collector-service 뉴스 수집 실행 모델](./docs/decisions/008-collector-service-뉴스-수집-실행-모델.md) | scheduler/internal API 진입점과 단일 인스턴스 lock 결정 |
 | [009. 외부 뉴스 provider 연동 기준](./docs/decisions/009-외부-뉴스-provider-연동-기준.md) | Google RSS, Naver, Finnhub provider 설정과 credential 기본 정책 |
-| [010. ai-service 초기 설계](./docs/decisions/010-ai-service-초기-설계.md) | 키워드 단위 AI 처리, 실행 모델, 저장 정책, LLM provider 연동 기준 |
-| [011. ai-service newsHash 요약 중복 방지](./docs/decisions/011-ai-service-newsHash-요약-중복-방지.md) | 요약 입력 묶음 식별 hash와 중복 저장 방지 결정 |
+| [010. ai-service 초기 설계](./docs/decisions/010-ai-service-초기-설계.md) | AI 처리 단위, 실행 모델, 저장 정책, LLM provider 연동 기준 |
+| [011. ai-service newsHash 요약 중복 방지](./docs/decisions/011-ai-service-newsHash-요약-중복-방지.md) | 요약 입력 묶음 식별 hash와 중복 저장 방지 결정(ADR 035에서 폐지) |
 | [012. notification-service 초기 모듈 설계](./docs/decisions/012-notification-service-초기-모듈-설계.md) | notification contract/core/service/worker 모듈 경계와 런타임 분리 기준 |
 | [013. notification 요청 접수와 dispatch 발행 흐름](./docs/decisions/013-notification-request-service-outbox-dispatch-flow.md) | notification.requested 접수, outbox 저장, notification.dispatch 발행 흐름 |
 | [014. notification dispatch 실패 분류와 Kafka retry 연결](./docs/decisions/014-notification-dispatch-retry-classification.md) | vendor 실패 분류, Kafka retry/DLT 연결, dispatch finalize CAS 기준 |
@@ -225,19 +224,20 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 | [017. MongoDB replica set 전환과 트랜잭션 전제](./docs/decisions/017-mongodb-replica-set-전환과-트랜잭션-전제.md) | MongoDB multi-document transaction을 위한 로컬 replica set 전환과 transaction boundary 원칙 |
 | [018. 재시도 폭주 방지와 복구 트래픽 제어](./docs/decisions/018-재시도-폭주-방지와-복구-트래픽-제어.md) | retry storm, retry budget, 서킷 브레이커, slow start, bulkhead 공통 설계 원칙 |
 | [019. notification 운영 모니터링 및 관측성 설계](./docs/decisions/019-notification-운영-모니터링-및-observability-설계.md) | notification metric contract, Prometheus/Grafana, 후속 trace/log 설계 |
-| [020. ai-service scheduler 실행 모델과 요약 window](./docs/decisions/020-ai-service-scheduler-실행-모델과-요약-window.md) | scheduler/internal API 실행 모델, 중복 실행 방지, watermark 기반 요약 window, 실패 키워드 격리와 해제 |
-| [021. ai-service LLM 실패 분류와 서킷 브레이커, failover, 키워드 격리](./docs/decisions/021-ai-service-llm-실패-분류와-provider-circuit-breaker.md) | 실패의 책임·지속 두 축을 소비처가 쓰는 규칙: 서킷 기록, hold, cooldown, 전 후보 합의 격리, skip 분리, tick 조기 중단, 순차 failover |
+| [020. ai-service scheduler 실행 모델과 요약 window](./docs/decisions/020-ai-service-scheduler-실행-모델과-요약-window.md) | scheduler/internal API 실행 모델, 중복 실행 방지, 반복 실패 대상 격리와 해제(요약 window·watermark는 ADR 035에서 폐지) |
+| [021. ai-service LLM 실패 분류와 서킷 브레이커, failover, 요약 대상 격리](./docs/decisions/021-ai-service-llm-실패-분류와-provider-circuit-breaker.md) | 실패의 책임·지속 두 축을 소비처가 쓰는 규칙: 서킷 기록, hold, cooldown, 전 후보 합의 격리, tick 조기 중단, 순차 failover |
 | [022. ai-service outbox와 이벤트 발행 보장](./docs/decisions/022-ai-service-outbox와-이벤트-발행-보장.md) | 요약/격리 이벤트 outbox, claim/finalize CAS, publish 실패 분류와 재시도 |
 | [023. ai-service 도메인 이벤트 발행과 ai-contract](./docs/decisions/023-ai-service-도메인-이벤트-발행과-ai-contract.md) | `ai.*` topic과 계약 모듈, Kafka 발행 실패 분류, producer timeout, relay와 발행 어댑터 스위치 분리 |
 | [024. 상태 전이 aggregate 불변화와 finalize CAS](./docs/decisions/024-상태-전이-aggregate-불변화와-finalize-cas.md) | notification aggregate 불변 전환, outbox finalize의 claim CAS, ai-service와 남기는 차이 |
 | [025. 키워드 구독과 알림 라우팅](./docs/decisions/025-키워드-구독과-알림-라우팅.md) | 구독·채널 바인딩 소유권, 키워드 identity 정규화, notification routing fan-out, 홉별 멱등 키, 주소 참조 |
 | [026. 키워드 identity와 구독, 채널 바인딩](./docs/decisions/026-키워드-identity와-구독-채널-바인딩.md) | canonical 키워드와 구독 분리, 정규화 규칙, 채널 바인딩 생명주기와 주소 암호화, internal API 계약 |
-| [027. 알림 라우팅 서비스](./docs/decisions/027-알림-라우팅.md) | routing을 독립 모듈·프로세스로, `notification.requested` 계약 연결, RoutingJob 멱등, 결정적 requestId, 키워드 격리 알림 수신자 |
+| [027. 알림 라우팅 서비스](./docs/decisions/027-알림-라우팅.md) | routing을 독립 모듈·프로세스로, `notification.requested` 계약 연결, RoutingJob 멱등과 진행 커서, 결정적 requestId, 수신자별 본문, 격리 알림 수신자 |
 | [028. 발송 직전 주소 조회와 스킵](./docs/decisions/028-발송-직전-주소-조회와-스킵.md) | worker의 `(recipientId, channel)` 주소 조회와 Redis 캐시, 없는 수신자의 스킵(SUPPRESSED), `sent:{requestId}` 발송 직전 가드, 전역 webhook 설정 삭제 |
-| [029. 전체 사이클 검증과 e2e-test 모듈](./docs/decisions/029-전체-사이클-검증과-e2e-test-모듈.md) | 모듈별 Kafka 계약 통합 테스트, 서비스 다섯 개를 컨테이너로 띄우는 `e2e-test` 모듈과 별도 task, skip/실패 규칙, 스모크 절차 |
+| [029. 전체 사이클 검증과 e2e-test 모듈](./docs/decisions/029-전체-사이클-검증과-e2e-test-모듈.md) | 모듈별 Kafka 계약 통합 테스트, 서비스 일곱 개를 컨테이너로 띄우는 `e2e-test` 모듈과 별도 task, skip/실패 규칙, 스모크 절차 |
 | [030. ai-service LLM 호출 단위, 실패 분류, 실호출 검증](./docs/decisions/030-ai-service-llm-호출-단위와-실패-분류와-실호출-검증.md) | API 규격·제공자·모델·용도 enum과 yaml의 경계, 전략·데코레이터·컴포지트 세 층 조립, 실패의 책임·지속 두 축, 프롬프트 버전을 코드에, `src/realTest` 소스셋과 운영 API |
 | [031. 요약 단위를 키워드에서 story로](./docs/decisions/031-요약-단위를-키워드에서-story로.md) | TDT 틀에서 같은 사건의 기사를 story로 묶는 방향, 세 층의 중복 제거, 모델 네 종류(임베딩·판정기·생성형·벡터 저장소)의 역할, 서비스 경계와 데이터 소유, 벡터 색인은 파생 캐시 |
 | [032. collector 기사 이벤트 발행과 collector-contract](./docs/decisions/032-collector-기사-이벤트-발행과-collector-contract.md) | 발췌문·URL 정규화 기사 모델, collector outbox와 relay, `collector.news.collected` 계약과 compact+delete topic, 발행·relay 스위치 분리 |
 | [033. story-service 조립](./docs/decisions/033-story-service-조립.md) | story·기사 사본 도메인, 골드셋으로 정한 2단계 판정 임계값, Mongo 먼저 색인 다음의 이중 쓰기, 닫기·병합·정리와 색인 자가 수리, Qdrant gRPC 채택 측정, delete 정책 topic 둘 |
-| [034. ai-service story 요약](./docs/decisions/034-ai-service-story-요약.md) | story·기사 사본으로 요약, 미요약 수 즉시 트리거와 대기 상한 tick, `(storyId, version)` 멱등과 story CAS, `developmentKind`별 발행, story 격리, `ai.summary.created` schemaVersion 2와 발행 스위치 |
+| [034. ai-service story 요약](./docs/decisions/034-ai-service-story-요약.md) | story·기사 사본으로 요약, 미요약 수 즉시 트리거와 대기 상한 tick, `(storyId, version)` 멱등과 story CAS, `developmentKind`별 발행, story 격리, `ai.summary.created` schemaVersion 2 |
+| [035. notification-routing의 story 요약 소비와 storyId 멱등](./docs/decisions/035-notification-routing-story-요약-소비와-storyId-멱등.md) | schemaVersion 2만 소비, `{storyId}:{version}` 멱등, 구독 수신자 페이지 조회와 진행 커서의 조건부 저장, 수신자별 본문, story 격리 알림, 발행 스위치, 키워드 요약 경로 폐지 |
 | [036. 실행 lock 포트 분리와 lock 범위](./docs/decisions/036-실행-lock-포트-분리와-lock-범위.md) | 중복 실행 방지를 `ExecutionLockPort`로 분리, 실행 단위마다 `INSTANCE`·`CLUSTER` 범위 선언, outbox relay가 `INSTANCE`인 이유 |

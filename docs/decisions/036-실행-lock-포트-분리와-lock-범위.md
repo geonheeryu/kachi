@@ -3,19 +3,18 @@
 ## 배경
 
 scheduler와 internal API 두 진입점에서 같은 작업이 동시에 시작되지 않도록, 서비스마다 `Executor`를 두고 중복 실행을 막아 왔다.
-지금 그런 `Executor`는 다섯이다.
-collector-service의 뉴스 수집과 outbox relay, ai-service의 뉴스 요약과 키워드 확장과 outbox relay다.
+그런 `Executor`는 collector-service의 뉴스 수집과 outbox relay, ai-service의 키워드 확장과 story 요약 tick과 outbox relay, story-service의 주기 작업과 outbox relay에 있다.
 
-다섯이 모두 같은 코드를 각자 갖고 있다.
+lock이 `Executor` 안에 있으면 `Executor`마다 같은 코드를 각자 갖는다.
 `AtomicReference`를 필드로 두고, `compareAndSet`으로 획득하고, `finally`에서 다시 `compareAndSet`으로 해제한다.
 
 ADR 008과 ADR 020은 이 lock이 단일 인스턴스 전제임을 밝히고, 분산 실행이 필요해지면 distributed lock으로 바꾼다고 적었다.
-그런데 그 교체를 실제로 하려면 `Executor` 다섯 개를 모두 열어야 한다.
+그런데 그 교체를 실제로 하려면 `Executor`를 모두 열어야 한다.
 lock 구현이 `Executor` 안에 들어 있어서, 바깥에서 갈아 끼울 수 있는 지점이 없기 때문이다.
 application service는 lock을 모르지만, 경계가 거기서 끝나고 `Executor` 아래로는 내려가지 않았다.
 
-다섯이 같은 코드를 쓰지만 성격은 같지 않다.
-뉴스 수집과 요약과 키워드 확장은 여러 인스턴스가 동시에 하면 외부 provider를 중복 호출하고 LLM 비용을 여러 배로 쓴다.
+같은 코드를 쓰지만 성격은 같지 않다.
+뉴스 수집과 story 요약 tick과 키워드 확장은 여러 인스턴스가 동시에 하면 외부 provider를 중복 호출하고 LLM 비용을 여러 배로 쓴다.
 반면 outbox relay는 여러 인스턴스가 동시에 돌아도 된다.
 같은 행을 두 번 발행하는 것은 저장소의 조건부 쓰기가 이미 막고 있고, relay가 막는 것은 앞선 tick이 끝나기 전에 다음 tick이 같은 행을 다시 조회하는 낭비다.
 이 차이를 코드가 말하지 않으면, 분산 lock을 넣을 때 relay까지 함께 끌려가 인스턴스를 늘려도 발행은 한 대만 하게 된다.
@@ -51,7 +50,6 @@ enum class AiExecutionLock(
     override val key: String,
     override val scope: ExecutionLockScope
 ) : ExecutionLockTarget {
-    NEWS_SUMMARY("ai-service:news-summary", CLUSTER),
     KEYWORD_EXPANSION("ai-service:keyword-expansion", CLUSTER),
     STORY_SUMMARY("ai-service:story-summary", CLUSTER),
     OUTBOX_RELAY("ai-service:outbox-relay", INSTANCE)
@@ -85,7 +83,7 @@ ADR 008은 수집 유스케이스가 lock 구현을 모른다는 점에서 헥�
 `CollectNewsService`는 lock을 모르는데 `NewsCollectionExecutor`는 lock 구현 그 자체를 들고 있었다.
 
 포트가 없으면 구현을 바꾸는 일이 교체가 아니라 수술이 된다.
-`Executor` 다섯을 열어 같은 수정을 다섯 번 하고, 그 다섯이 서로 어긋나지 않기를 사람이 확인해야 한다.
+`Executor`를 모두 열어 같은 수정을 여러 번 하고, 그것들이 서로 어긋나지 않기를 사람이 확인해야 한다.
 포트를 두면 바뀌는 것은 adapter 하나와 그것을 고르는 조립 한 줄이다.
 
 이는 DIP다.
@@ -150,7 +148,7 @@ ADR 020은 해제를 `finally`에 두는 이유를 이렇게 적었다.
 
 lock을 읽지 못했을 때 그냥 실행하는 선택도 가능하지만 그렇게 하지 않는다.
 그 순간은 lock이 필요한 이유가 사라진 것이 아니라 확인할 수단이 사라진 것이고, 실행하면 인스턴스 수만큼 외부 provider를 호출하거나 LLM을 부른다.
-한 tick을 쉬는 손해가 훨씬 작으며, 수집과 요약은 다음 실행이 그 구간을 다시 가져간다.
+한 tick을 쉬는 손해가 훨씬 작으며, 수집과 요약은 다음 실행이 남은 일을 가져간다.
 
 ### 임대는 소유자가 사라진 뒤의 상한이다
 
@@ -165,7 +163,7 @@ lock을 읽지 못했을 때 그냥 실행하는 선택도 가능하지만 그�
 
 ## 결과
 
-`Executor` 다섯에 흩어져 있던 같은 코드가 adapter 한 곳으로 모인다.
+`Executor`마다 흩어져 있던 같은 코드가 서비스마다 adapter 한 곳으로 모인다.
 `Executor`는 lock을 거쳐 유스케이스를 부르고 결과를 자기 타입으로 옮기는 일만 한다.
 시각을 다루는 책임도 함께 adapter로 옮겨간다.
 

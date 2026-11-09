@@ -2,7 +2,7 @@
 
 ## 배경
 
-ai-service는 뉴스 요약과 키워드 확장에 외부 LLM을 쓴다. 이전 구조는 다음과 같았다.
+ai-service는 story 요약과 키워드 확장에 외부 LLM을 쓴다. 이전 구조는 다음과 같았다.
 
 - provider 이름만 enum이고 모델은 yaml 문자열이었다.
 - provider마다 `enabled`로 켜고 무작위로 하나를 골랐다.
@@ -48,7 +48,7 @@ ai-service는 뉴스 요약과 키워드 확장에 외부 LLM을 쓴다. 이전 
 | API 규격 | 요청·응답 JSON의 모양. 코드가 분기하는 유일한 축 | `LlmApi` | `OPENAI_CHAT_COMPLETIONS` |
 | 제공자 | 한 계정으로 부르는 한 서비스. 회사와 계정 | `LlmProvider` | `GROQ`, `MISTRAL`, `OLLAMA` |
 | 모델 | 그 제공자에서 부르는 모델 하나 | `LlmModel` | `GROQ_QWEN3_27B`, `OLLAMA_QWEN3_27B` |
-| 용도 | 앱이 LLM을 부르는 이유. `LlmProviderPort`의 메서드와 1:1 | `LlmUse` | `NEWS_SUMMARY`, `KEYWORD_EXPANSION` |
+| 용도 | 앱이 LLM을 부르는 이유. `LlmProviderPort`의 메서드와 1:1 | `LlmUse` | `STORY_SUMMARY`, `KEYWORD_EXPANSION` |
 
 API 규격과 제공자를 나눈 이유는 둘이 다른 축이기 때문이다.
 
@@ -83,7 +83,7 @@ kachi.ai.llm:
     GROQ_QWEN3_27B:   { timeout: 10s,  slow-after: 8s }
     OLLAMA_QWEN3_27B: { timeout: 150s, slow-after: 120s }
   uses:
-    NEWS_SUMMARY:      { candidates: [GROQ_QWEN3_27B, MISTRAL_SMALL_2603] }
+    STORY_SUMMARY:     { candidates: [GROQ_QWEN3_27B, MISTRAL_SMALL_2603] }
     KEYWORD_EXPANSION: { candidates: [GROQ_QWEN3_27B, MISTRAL_SMALL_2603] }
   guard:
     circuit-breaker: { sliding-window-size: 6, minimum-number-of-calls: 3, failure-rate-threshold: 50, slow-call-rate-threshold: 80, wait-duration-in-open-state: 60s, permitted-number-of-calls-in-half-open-state: 2 }
@@ -106,7 +106,7 @@ LlmProperties(yaml, 바인딩 직후 검증)
    ├ 제공자마다  provider.api ──▶ adapter                         전략 패턴 (규격마다 LlmProviderPort 구현 하나)
    ├ 후보 모델마다 adapter + model + timeout ──▶ GuardedLlmModel     데코레이터 패턴 (같은 포트로 감쌈: 서킷 · cooldown · hold)
    └ 용도마다    candidates 순서 ──▶ RoutingLlmProvider            컴포지트 패턴 (같은 포트로 후보를 묶음) + 순차 failover
-SummarizeNewsService ──▶ LlmProviderPort.summarizeNews()   NEWS_SUMMARY 후보를 순서대로
+SummarizeStoryService ──▶ LlmProviderPort.prepareStorySummary() STORY_SUMMARY 후보를 순서대로
 ExpandKeywordsService ──▶ LlmProviderPort.expandKeyword()  KEYWORD_EXPANSION 후보를 순서대로
 ```
 
@@ -123,7 +123,7 @@ ExpandKeywordsService ──▶ LlmProviderPort.expandKeyword()  KEYWORD_EXPANSI
 
 - 느슨한 결합: 가드·라우터·application 서비스는 adapter 구현을 모르고 포트 계약만 본다. adapter를 바꿔도 위 층은 바뀌지 않는다.
 - 확장성: 새 회사가 OpenAI 규격이면 `LlmProvider` 상수와 yaml 항목이 전부다. 새 규격이면 `LlmApi` 상수와 adapter 하나를 더하고, 선택 분기의 `when`이 빠진 규격을 컴파일에서 잡는다.
-- 다형성: 같은 `summarizeNews` 호출이 규격에 따라 다른 adapter로 간다. 후보 모델마다 인스턴스를 따로 만들지만 규격이 같으면 클래스는 하나다.
+- 다형성: 같은 `summarizeStory` 호출이 규격에 따라 다른 adapter로 간다. 후보 모델마다 인스턴스를 따로 만들지만 규격이 같으면 클래스는 하나다.
 
 **데코레이터 패턴.** 차단을 데코레이터 패턴으로 구현한다. `GuardedLlmModel`이 adapter를 같은 포트로 감싸 모델 하나의 서킷·cooldown·hold를 관리한다. 401·402·403은 계정 문제라 제공자 단위 hold를 가드들이 공유한다(`ProviderHoldRegistry`).
 
@@ -145,7 +145,7 @@ ExpandKeywordsService ──▶ LlmProviderPort.expandKeyword()  KEYWORD_EXPANSI
 
 이전에는 `retryable` 하나에서 "다음 tick 재시도", "다른 provider로 failover", "이 provider를 제외"가 파생됐다. 셋은 다른 질문이라 근거를 따로 둔다.
 
-- 책임 `LlmFailureAttribution`: 이 실패의 책임이 어디 있는가. `INPUT`(이 키워드의 요청·응답), `MODEL`, `PROVIDER`(계정과 endpoint), `NONE`(우리 가드가 호출 전에 막음).
+- 책임 `LlmFailureAttribution`: 이 실패의 책임이 어디 있는가. `INPUT`(이 요약 대상의 요청·응답), `MODEL`, `PROVIDER`(계정과 endpoint), `NONE`(우리 가드가 호출 전에 막음).
 - 지속 `transient`: 다음 tick이나 다음 후보에서 저절로 풀리는가.
 
 | 상황 | 코드 | 책임 | transient |
@@ -170,7 +170,7 @@ ExpandKeywordsService ──▶ LlmProviderPort.expandKeyword()  KEYWORD_EXPANSI
 | 모델 hold | 책임이 MODEL이고 transient가 아닐 때. `reprobe-after` 뒤 한 번 다시 시도 |
 | 제공자 hold | 책임이 PROVIDER이고 transient가 아닐 때. 그 제공자의 모든 모델을 뺀다. `reprobe-after` 뒤 다시 시도 |
 | cooldown | 429. Retry-After를 따르고 없으면 기본값, 상한 있음 |
-| 키워드 격리 카운트 | 시도한 후보 전부가 INPUT으로 끝났을 때만 |
+| story 격리 카운트 | 시도한 후보 전부가 INPUT으로 끝났을 때만 |
 | tick 조기 중단 | 실제 호출이 한 건도 나갈 수 없을 때. 후보 전부가 차단·hold·cooldown |
 
 hold는 서킷과 다른 상태다.
@@ -179,18 +179,18 @@ hold는 서킷과 다른 상태다.
 - 재탐색 간격을 둔 이유는 403 일일 한도처럼 시간이 풀어 주는 경우가 있어서다.
 - 운영자 reset은 서킷·cooldown·hold를 함께 푼다.
 
-키워드 격리를 "전 후보 합의"로 좁힌 이유는 격리의 오판 비용이 호출 비용보다 크기 때문이다.
+story 격리를 "전 후보 합의"로 좁힌 이유는 격리의 오판 비용이 호출 비용보다 크기 때문이다.
 
-- 400과 JSON 계약 위반은 키워드 탓일 수도 모델 탓일 수도 있다.
-- 격리는 자동 해제가 없어 한 번 잘못 세면 운영자가 손댈 때까지 그 키워드는 영구 정지다.
-- 나쁜 키워드 하나에 tick당 후보 수만큼 호출이 드는 것이 그 대가다.
+- 400과 JSON 계약 위반은 story 탓일 수도 모델 탓일 수도 있다.
+- 격리는 자동 해제가 없어 한 번 잘못 세면 운영자가 손댈 때까지 그 story는 요약되지 않는다.
+- 나쁜 story 하나에 시도당 후보 수만큼 호출이 드는 것이 그 대가다.
 
 ### 프롬프트와 버전은 코드에 함께 두고, 모델 교체는 재요약을 일으키지 않는다
 
 - 프롬프트 본문과 버전을 한 파일에 둔다(`LlmPrompt`와 용도별 객체). 이전에는 본문이 adapter 상수, 버전이 yaml에 따로 있어 어긋날 수 있었다.
 - ADR 011의 "model 교체 시 promptVersion을 올린다" 규칙은 폐지한다.
-  - 요약은 10분 window의 뉴스 묶음이라 수명이 짧다. 모델을 바꿨다고 옛 묶음을 다시 요약하면 새 `summaryId`가 생겨 같은 뉴스 알림이 다시 나간다.
-  - 저장 키 `keyword + newsHash + promptVersion`은 그대로이고 promptVersion은 프롬프트만 뜻한다.
+  - 요약 버전은 새 기사가 있을 때만 생긴다. 모델을 바꿨다고 이미 요약한 기사를 다시 요약하면 새 버전이 생겨 같은 사건 알림이 다시 나간다.
+  - promptVersion은 프롬프트만 뜻한다.
 - 요청한 모델(`requestedModel`)과 응답이 보고한 모델(`model`)을 따로 기록한다.
   - 응답이 모델을 보고하지 않으면 요청한 모델을 그대로 둔다. 둘 다 항상 값이 있다.
   - Mongo 문서에는 `requestedModel`을 더하고 기존 `model`은 유지한다. 운영 데이터가 없어 옛 문서 호환 코드는 두지 않는다.
@@ -244,18 +244,18 @@ hold는 서킷과 다른 상태다.
 - 회사마다 adapter 클래스: 같은 규격의 코드가 회사 수만큼 복제된다. 규격과 회사를 나눈 이유가 이것이다.
 - 실호출 게이트를 시스템 프로퍼티나 JUnit 태그로: 프로퍼티는 IDE에서 매번 VM 옵션이 필요하고, 태그는 러너에 따라 같은 클릭의 결과가 달라진다. 소스셋은 디렉토리가 곧 스위치다.
 - 기동 시 자동 probe: 재기동마다 호출이 나가고 테스트 stub이 `/models`까지 흉내 내야 한다.
-- INPUT 실패를 첫 후보에서 즉시 확정: 호출은 1회로 끝나지만 모델 탓 실패가 키워드를 영구 격리한다.
+- INPUT 실패를 첫 후보에서 즉시 확정: 호출은 1회로 끝나지만 모델 탓 실패가 story를 영구 격리한다.
 - gateway(LiteLLM 등) 도입: 다른 서비스가 LLM을 부르거나, credential을 앱 밖에서 중앙 통제하거나, 정책 변경이 배포와 분리돼 잦거나, JVM 밖 소비자가 생길 때 다시 본다. 지금은 넷 다 아니다.
 
 ## 트레이드오프
 
 - 장점:
-  - 죽은 모델이나 결제 문제가 키워드를 격리시키지 않는다. 그 단위만 빠지고 다음 후보로 넘어간다.
+  - 죽은 모델이나 결제 문제가 story를 격리시키지 않는다. 그 단위만 빠지고 다음 후보로 넘어간다.
   - 모델·제공자·옵션의 오타와 누락을 컴파일이 잡고, 존재와 계약은 realTest가 잡는다.
   - 새 회사는 상수 하나, 새 규격은 adapter 하나, 후보 변경은 yaml 한 줄이다.
 - 단점:
   - 새 모델은 코드 변경과 커밋이다. 다만 검증을 거쳐 커밋하는 것이 어차피 규칙이다.
-  - 나쁜 키워드 하나가 격리되기까지 tick당 후보 수만큼 호출이 든다.
+  - 나쁜 story 하나가 격리되기까지 시도당 후보 수만큼 호출이 든다.
   - 서킷·cooldown·hold는 인스턴스마다 독립이다. 인스턴스가 늘면 Redis로 옮긴다.
 
 ## 운영 제약

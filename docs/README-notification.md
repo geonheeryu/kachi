@@ -23,7 +23,7 @@ kachi의 notification 컨텍스트를 한곳에서 읽는 문서다. 핵심만 �
 
 | 토픽 | 발행 | 파티션 키 | 소비 그룹 | 실패하면 |
 | --- | --- | --- | --- | --- |
-| `ai.summary.created`, `ai.keyword.quarantined` | ai-service | - | `notification-routing` | 1초 간격 3회 뒤 `notification.routing.dlt` |
+| `ai.summary.created`, `ai.story.quarantined` | ai-service | `storyId` | `notification-routing` | 1초 간격 3회 뒤 `notification.routing.dlt` |
 | `notification.requested` | routing | `requestId` | `notification-service` | 1초 간격 3회 뒤 `notification.requested.dlt` |
 | `notification.dispatch` | service relay | `recipientId` | `notification-worker` | 수동 ack. 1초 간격 3회 뒤 `notification.dispatch.dlt` |
 | `notification.dispatch.dlt` | worker | 원본 키 | `notification-worker-dlt` | MongoDB 저장이 성공한 뒤에만 ack |
@@ -49,7 +49,7 @@ kachi의 notification 컨텍스트를 한곳에서 읽는 문서다. 핵심만 �
 | --- | --- | --- |
 | `notification-contract` | - | Kafka 이벤트 계약 |
 | `notification-core` | - | 도메인, inbound·outbound 포트, 유스케이스. Spring에 의존하지 않는다 |
-| `notification-routing` | 8086 | 요약 이벤트를 수신자 x 채널 알림 요청으로 fan-out |
+| `notification-routing` | 8086 | story 요약 이벤트를 구독 수신자 x 채널 알림 요청으로 fan-out |
 | `notification-service` | 8084 | 접수, outbox relay, 운영 API |
 | `notification-worker` | 8085 | dispatch 소비, 채널 발송, 회수, DLT 저장 |
 
@@ -123,9 +123,19 @@ sender는 vendor 응답을 `RetryFailure(source, category)`로 바꿔 돌려준�
 
 routing은 계약 모듈에만 의존하는 독립 프로세스다. fan-out이 접수 API와 자원을 나눠 쓰지 않게 하려는 분리다.
 
-요청 키는 입력만으로 정해진다: 요약 알림은 `sum:{summaryId}:u:{recipientId}:c:{CHANNEL}`, 키워드 격리 알림은 `qrt:{eventKey}:u:{recipientId}:c:{CHANNEL}`. 격리 알림의 수신자는 user-service에서 조회한 관리자다. routing이 중간에 죽어 같은 이벤트를 처음부터 다시 펼쳐도 같은 `requestId`가 나오므로 접수 쪽 멱등이 거른다. 그래서 routing 안에 진행 커서나 outbox를 두지 않았다.
+요청 키는 입력만으로 정해진다.
 
-상세문서: [ADR 025](decisions/025-키워드-구독과-알림-라우팅.md) · [ADR 027](decisions/027-알림-라우팅.md)
+- 요약 알림은 `sum:{storyId}:{version}:u:{recipientId}:c:{CHANNEL}`, story 격리 알림은 `qrt:{eventKey}:u:{recipientId}:c:{CHANNEL}`이다.
+- 키에 키워드가 없으므로 한 사용자가 story의 키워드를 몇 개 구독했든 story 한 버전에 채널당 한 통이다.
+
+요약 알림의 수신자는 user-service의 구독 수신자 조회를 페이지 단위로 읽어 정한다. 격리 알림의 수신자는 user-service에서 조회한 관리자다.
+
+- 페이지의 요청을 동시에 발행하고 broker ack를 모두 받으면 `RoutingJob`에 다음 커서를 저장한다.
+- routing이 중간에 죽으면 재전달 때 저장된 커서부터 잇는다. 커서 뒤 페이지의 이미 발행된 요청은 같은 `requestId`라 접수 쪽 멱등이 거른다.
+- 본문 머리에는 그 수신자가 구독한 키워드의 `displayName`이 들어간다.
+- routing은 원천이 Kafka 레코드라 outbox를 두지 않는다.
+
+상세문서: [ADR 025](decisions/025-키워드-구독과-알림-라우팅.md) · [ADR 027](decisions/027-알림-라우팅.md) · [ADR 035](decisions/035-notification-routing-story-요약-소비와-storyId-멱등.md)
 
 ### 발송 직전 주소 조회와 스킵
 
@@ -150,7 +160,7 @@ core에는 `NotificationSender` 포트(`supports(channel)`, `send`)만 둔다. v
 | 도메인·유스케이스 | fake 포트, 고정 Clock | 상태 전이 가드, 재시도 판정, claim 경합과 늦은 결과의 분기 |
 | adapter 통합 | Testcontainers MongoDB replica set, Redis | 조건부 update의 원자성, 트랜잭션 롤백, unique index, TTL |
 | 경계 계약 | Testcontainers Kafka | 실제 broker에서 소비해 발행하기까지의 계약, 모르는 스키마 버전의 DLT |
-| e2e | bootJar 컨테이너 5개 | 구독 등록부터 발송 완료까지, 프로세스 사이의 타이밍 |
+| e2e | bootJar 컨테이너 7개 | 기사 수집부터 발송 완료까지, 프로세스 사이의 타이밍 |
 
 인프라가 없으면 건너뛰지 않고 실패한다. 통합 테스트도 운영과 같은 unique index를 만든다.
 
@@ -263,5 +273,6 @@ env 파일과 프로파일은 [루트 README](../README.md), 실제 채널로 �
 | [ADR 019](decisions/019-notification-운영-모니터링-및-observability-설계.md) | 단계별 counter와 timer, Prometheus, Grafana |
 | [ADR 024](decisions/024-상태-전이-aggregate-불변화와-finalize-cas.md) | 전이는 새 인스턴스, 확정은 전이 전 claim을 기대값으로 CAS |
 | [ADR 025](decisions/025-키워드-구독과-알림-라우팅.md) · [026](decisions/026-키워드-identity와-구독-채널-바인딩.md) · [027](decisions/027-알림-라우팅.md) | 구독과 라우팅, 채널 바인딩, 라우팅 서비스 분리 |
+| [ADR 035](decisions/035-notification-routing-story-요약-소비와-storyId-멱등.md) | story 요약 소비, storyId 멱등, 구독 수신자 페이지와 진행 커서 |
 | [ADR 028](decisions/028-발송-직전-주소-조회와-스킵.md) | 주소 없으면 `SUPPRESSED`, 발송 직전 sent 가드 |
 | [ADR 029](decisions/029-전체-사이클-검증과-e2e-test-모듈.md) · [테스트 전략](테스트전략.md) | 계약 통합 테스트와 e2e 모듈 |

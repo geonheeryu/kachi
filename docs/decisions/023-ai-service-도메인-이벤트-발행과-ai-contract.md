@@ -2,11 +2,11 @@
 
 ## 배경
 
-ADR 022로 ai-service는 뉴스 요약 생성과 키워드 격리를 outbox에 기록하고, relay가 그 행을 발행 포트(`AiOutboxPublisherPort`)로 내보낸다.
+ADR 022로 ai-service는 story 요약 버전과 story 격리를 outbox에 기록하고, relay가 그 행을 발행 포트(`AiOutboxPublisherPort`)로 내보낸다.
 발행 포트의 구현이 없어 relay는 꺼져 있고, outbox는 PENDING으로 쌓이기만 한다. 이 ADR은 그 구현을 붙인다.
 
 알림을 누가 어떤 채널로 받는지는 구독의 문제이고(ADR 025) ai-service의 관심사가 아니다. 
-ai-service는 "요약이 생겼다", "키워드가 격리됐다"는 사실만 발행하고, 그것을 알림으로 fan-out하는 일은 notification-service의 routing이 한다.
+ai-service는 "요약 버전이 생겼다", "story가 격리됐다"는 사실만 발행하고, 그것을 알림으로 fan-out하는 일은 notification-routing이 한다.
 
 여기서 정하는 것은 세 가지다.
 
@@ -18,21 +18,24 @@ ai-service는 "요약이 생겼다", "키워드가 격리됐다"는 사실만 �
 
 ### topic과 계약
 
-outbox 행 하나는 Kafka 레코드 하나다. 행의 `eventType`이 topic을 고르고, `partitionKey`(keyword)가 레코드 key, `payload`가 값이다. 
+outbox 행 하나는 Kafka 레코드 하나다. 행의 `eventType`이 topic을 고르고, `partitionKey`(storyId)가 레코드 key, `payload`가 값이다. 
 payload는 outbox에 기록할 때 이미 계약 JSON으로 직렬화되어 있으므로(ADR 022) 발행 시점에는 손대지 않는다.
 
-| eventType | topic | 계약 |
-| --- | --- | --- |
-| `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEvent` |
-| `KEYWORD_QUARANTINED` | `ai.keyword.quarantined` | `AiKeywordQuarantinedEvent` |
+| eventType | topic | key | 계약 |
+| --- | --- | --- | --- |
+| `SUMMARY_CREATED` | `ai.summary.created` | storyId | `AiSummaryCreatedEvent` (schemaVersion 2) |
+| `STORY_SPLIT_REQUESTED` | `ai.story.split-requested` | storyId | `AiStorySplitRequestedEvent` |
+| `STORY_QUARANTINED` | `ai.story.quarantined` | storyId | `AiStoryQuarantinedEvent` |
 
-계약 클래스는 `ai-contract` 모듈로 옮긴다. 지금까지 `ai-service` 안 `me.rgunny.kachi.ai.contract` 패키지였는데, 소비자(notification-service routing)가 생기므로 notification-contract와 같은 형태의 독립 모듈이 된다. 
+`AiSummaryCreatedEvent`는 story 요약 버전 하나를 싣는다. 필드는 summaryId, storyId, version, keywords, developmentKind, title, content, sentiment, sourceNewsCount, provider, model, promptVersion, createdAt이고, 필드와 발행 조건은 ADR 034가 정한다.
+
+계약 클래스는 `ai-contract` 모듈에 둔다. 소비자(notification-routing)가 같은 타입으로 읽도록 notification-contract와 같은 형태의 독립 모듈이다. 
 모듈에는 data class와 enum만 있고 로직·의존성이 없다(ADR 012). 
 bounded context 간 코드 의존 금지(ADR 021)는 계약 모듈에 적용되지 않는다.
 
 `schemaVersion`은 payload 필드로 유지한다. 필드 추가는 같은 버전, 의미 변경은 버전을 올리고 소비자가 거부하게 한다.
 
-같은 키워드의 이벤트는 같은 파티션으로 가므로 요약 순서가 지켜진다. 소비자 쪽 순서(사용자별)는 소비자가 정한다.
+같은 story의 이벤트는 같은 파티션으로 가므로 버전 순서가 지켜진다. 소비자 쪽 순서(사용자별)는 소비자가 정한다.
 
 ### 발행 실패 분류
 
@@ -95,9 +98,11 @@ relay는 행마다 claim 직전에 소유권을 잡고 발행이 끝나면 확�
 | `kachi.ai.outbox.relay.enabled` | outbox 행을 읽어 발행 포트로 넘기는 relay (ADR 022) | outbox가 PENDING으로 쌓인다. stale 회수도 멈춘다 |
 | `kachi.ai.events.enabled` | Kafka 발행 어댑터 | 발행 포트 구현이 없다. Kafka producer 관련 빈이 만들어지지 않는다 |
 
+저장 쪽에는 발행을 끄는 설정이 없다. 요약 버전·격리 전이와 outbox 행 기록은 항상 한 트랜잭션이다(ADR 035).
+
 둘 다 기본값은 `true`다. 
 ADR 022가 relay를 false로 둔 이유("publisher 어댑터가 없는 동안")가 사라졌다. 
-로컬 프로파일과 테스트 프로파일은 둘 다 false다. broker 없이 기동하는 환경이다.
+테스트 프로파일은 둘 다 false다. broker 없이 기동하는 환경이다.
 
 relay는 켜져 있는데 어댑터가 꺼진 조합은 모순된 설정이다. 
 명시적으로 기동 시 실패시켜야 런타임 상황에 알 수 없는 예외가 발생하지 않는다. 
@@ -115,7 +120,8 @@ kachi:
       enabled: true
       topics:
         summary-created: ai.summary.created
-        keyword-quarantined: ai.keyword.quarantined
+        story-split-requested: ai.story.split-requested
+        story-quarantined: ai.story.quarantined
 ```
 
 ### 운영 규칙
@@ -123,7 +129,7 @@ kachi:
 - **relay를 켜기 전 PENDING backlog.** 꺼 둔 동안 쌓인 PENDING은 켜는 즉시 batch 50건씩 발행된다. 
   - 오래된 요약이 한꺼번에 알림으로 나가는 것이 원치 않는 결과라면 켜기 전에 `GET /internal/ai/outboxes?status=PENDING`으로 양을 보고, 필요하면 오래된 행을 정리한다.
 - **DEAD 복구.** DEAD가 된 outbox를 운영 API로 복구하면 같은 eventKey로 다시 발행된다. 
-  - 소비자는 `summaryId` 기준으로 중복을 걸러야 한다(ADR 025 RoutingJob). 발행 쪽은 중복을 막지 않는다.
+  - 소비자는 `storyId:version` 기준으로 중복을 걸러야 한다(ADR 035 RoutingJob). 발행 쪽은 중복을 막지 않는다.
 - **topic 생성.** `ai.*` topic은 ai-service가 소유한다. 
   - 로컬은 `docker-compose.kafka.yml`의 auto-create에 기댄다.
 
@@ -153,10 +159,9 @@ kachi:
 
 - 단점: 
   - 이 ADR만으로는 알림이 나가지 않는다. 
-  - routing(ADR 025 R1)이 붙기 전까지 `ai.*` topic에는 소비자가 없다.
   - 모듈이 하나 늘어난다.
 
 ## 후속
 
 - Kafka Testcontainers로 relay -> 발행 -> 계약대로 읽히는지 검증하는 통합 테스트 (ADR 029에서 추가했다)
-- 소비자: notification-service routing (ADR 025 R1)
+- 소비자: notification-routing (ADR 027·035)

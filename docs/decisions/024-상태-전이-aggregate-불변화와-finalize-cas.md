@@ -58,7 +58,7 @@ notification-service의 outbox publish 확정은 아직 CAS가 아니라 `mongoT
   - `List<NotificationHistory>`를 `copy(uncommittedHistories = uncommittedHistories + record)`로 넘기면 되고, 어댑터가 한 번에 insert하는 구조는 그대로다.
 - 비용은 `copy` 헬퍼가 흡수한다.
   - 헬퍼가 있는 `AiOutbox`는 전이당 바뀌는 필드만 적는다.
-  - 헬퍼 없이 전이마다 생성자 인자 전부를 다시 적는 `KeywordQuarantine`이 반례이고, 그쪽도 헬퍼를 두는 것이 후속이다.
+  - 헬퍼 없이 전이마다 생성자 인자 전부를 다시 적는 `StoryQuarantine`이 반례이고, 그쪽도 헬퍼를 두는 것이 후속이다.
 - DDD 원전은 근거가 아니다.
   - Evans의 Entity는 원래 가변이고, 불변 선호는 Kotlin과 함수형 관용이다.
   - 식별자로 연속성을 유지하며 상태가 바뀌는 객체가 Entity의 정의이고, 불변은 Value Object의 성질이다.

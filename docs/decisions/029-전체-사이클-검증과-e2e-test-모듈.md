@@ -22,8 +22,8 @@
 1. 모듈 경계의 broker 계약을 어디서 어떻게 검증하는가.
 2. 전체 사이클을 한 테스트로 도는 자리를 어디에 두는가.
    테스트전략은 "테스트 편의를 위한 모듈 간 공유 모듈을 만들지 않는다"고 정해 뒀다.
-3. 서비스 다섯 개를 테스트 안에서 어떻게 띄우는가.
-4. 뉴스 수집·LLM·vendor처럼 바깥과 닿는 지점을 무엇으로 대신하는가.
+3. 서비스들을 테스트 안에서 어떻게 띄우는가.
+4. 뉴스 provider·LLM·TEI·vendor처럼 바깥과 닿는 지점을 무엇으로 대신하는가.
 5. 무거운 테스트를 평소의 `./gradlew test`에 넣을 것인가.
 6. 실제 LLM과 실제 채널로 사람이 확인하는 절차를 어떻게 남기는가.
 
@@ -34,43 +34,47 @@
 | 선택 | 장점 | 단점 |
 | --- | --- | --- |
 | notification-worker 같은 기존 모듈의 통합 테스트를 확장한다 | 새 모듈이 없다 | 그 모듈이 다른 서비스 네 개의 jar에 의존하게 된다. 모듈 경계가 테스트 때문에 무너진다 |
-| 테스트 JVM 하나에 Spring 컨텍스트 다섯 개를 띄운다 | 컨테이너가 인프라 네 개뿐이라 빠르다 | 다섯 모듈의 자동설정(Security, JPA, Flyway, Kafka listener)이 한 classpath에 섞인다. 어느 컨텍스트가 어느 빈을 만들었는지 갈라내는 비용이 검증 가치보다 크다 |
-| 별도 `e2e-test` 모듈이 서비스 다섯 개를 각각 컨테이너로 띄운다 | 실제 배포 단위와 같은 경계로 검증한다. 어느 모듈도 이 모듈에 의존하지 않는다 | 한 번 도는 데 몇 분이 걸린다. 서비스 jar를 컨테이너에 넣는 방식이 필요하다 |
+| 테스트 JVM 하나에 서비스마다 Spring 컨텍스트를 띄운다 | 컨테이너가 인프라뿐이라 빠르다 | 여러 모듈의 자동설정(Security, JPA, Flyway, Kafka listener)이 한 classpath에 섞인다. 어느 컨텍스트가 어느 빈을 만들었는지 갈라내는 비용이 검증 가치보다 크다 |
+| 별도 `e2e-test` 모듈이 서비스마다 컨테이너를 띄운다 | 실제 배포 단위와 같은 경계로 검증한다. 어느 모듈도 이 모듈에 의존하지 않는다 | 한 번 도는 데 몇 분이 걸린다. 서비스 jar를 컨테이너에 넣는 방식이 필요하다 |
 
 세 번째를 택했다.
 
 테스트전략이 금지한 것은 여러 모듈이 **의존하는** 테스트 공유 모듈이다.
 `e2e-test`는 반대 방향이다.
-모듈들의 산출물(bootJar)과 계약 모듈(`ai-contract`·`notification-contract`)만 소비하고, 다른 모듈은 이 모듈을 모른다.
+모듈들의 산출물(bootJar)과 계약 모듈만 소비하고, 다른 모듈은 이 모듈을 모른다.
 
 ## 결정
 
 ### 경계 통합 테스트는 각 모듈이 Kafka Testcontainers로 자기 계약을 검증한다
 
 - **ai-service**
-  - `AiSummaryCycleIntegrationTest`가 Mongo replica set과 Kafka 컨테이너 위에서 요약 -> outbox -> relay -> broker까지 돈다.
-  - broker에서 읽은 레코드는 `ai-contract`의 `AiSummaryCreatedEvent`·`AiKeywordQuarantinedEvent`로 역직렬화한다.
+  - `AiStorySummaryCycleIntegrationTest`가 Mongo replica set과 Kafka 컨테이너 위에서 story 이벤트 소비 -> 요약 -> outbox -> relay -> broker까지 돈다.
+  - broker에서 읽은 레코드는 `ai-contract`의 계약 타입으로 역직렬화한다.
     소비자가 쓰는 타입으로 읽어야 계약 검증이다.
-  - 시나리오: 정상 발행, rate limit 조기 중단, 부분 실패 시 watermark 유지, 격리 이벤트 발행, stale PUBLISHING 회수, 같은 뉴스 재실행 시 이벤트 없음.
+  - 시나리오: 즉시 트리거 요약의 schemaVersion 2 발행, 병합 뒤 요약, `NEW_STORY`의 분리 요청 발행, 계약 위반 메시지의 DLT.
 - **notification-routing**
-  - `RoutingKafkaContractIntegrationTest`가 `ai.summary.created`·`ai.keyword.quarantined`를 소비해 `notification.requested`를 발행하는 계약을 검증한다.
+  - `RoutingKafkaContractIntegrationTest`가 `ai.summary.created`·`ai.story.quarantined`를 소비해 `notification.requested`를 발행하는 계약을 검증한다.
+  - 구독 수신자 조회가 여러 페이지일 때 모든 페이지의 수신자가 발행되는 것을 검증한다.
   - 모르는 `schemaVersion`이 DLT로 가는 것을 검증한다.
 - **notification-service와 worker의 소비 계약은 따로 만들지 않는다.**
   - 아래 e2e 시나리오가 덮는다.
 
-LLM·collector·user-service 호출은 테스트 JVM 안의 HTTP stub이 받는다.
+LLM·user-service 호출은 테스트 JVM 안의 HTTP stub이 받는다.
 
 - stub은 모듈마다 둔다 (테스트전략의 fixture 규칙).
 - 응답은 path별 큐라 "429 다음 200" 같은 순서를 표현한다.
 
-### 전체 사이클은 `e2e-test` 모듈이 서비스 컨테이너 다섯 개로 돈다
+### 전체 사이클은 `e2e-test` 모듈이 서비스 컨테이너 일곱 개로 돈다
+
+기준은 "우리 서비스와 인프라는 실물, 외부 vendor만 stub"이다.
 
 ```
-[e2e-test JVM] LLM stub · collector stub · JWT 발급 · 단언용 Kafka consumer
-        │ host.testcontainers.internal
-────────┼──────────── Docker network ────────────
- mysql · mongo(rs0) · redis · kafka
- user-service · ai-service · notification-routing · notification-service · notification-worker
+[e2e-test JVM] 뉴스 provider stub · LLM stub · TEI stub · JWT 발급 · 단언용 Kafka consumer
+        | host.testcontainers.internal
+--------+------------ Docker network ------------
+ mysql · mongo(rs0) · redis · kafka · qdrant
+ user-service · collector-service · story-service · ai-service
+ notification-routing · notification-service · notification-worker
 ```
 
 - **서비스는 각 모듈의 `bootJar`를 JDK 베이스 컨테이너에 복사해 `java -jar`로 띄운다.**
@@ -80,9 +84,11 @@ LLM·collector·user-service 호출은 테스트 JVM 안의 HTTP stub이 받는�
 - **프로파일은 `local`이고 인프라 주소와 토글은 환경변수로 덮는다.**
   - 모듈에 `application-e2e.yaml`을 심지 않는다.
     테스트 설정은 테스트 쪽에 있어야 한다.
-- **collector-service는 띄우지 않는다.**
-  - 실제 뉴스 provider 없이는 뉴스가 생기지 않고 시드 주입 API도 없다.
-  - ai-service는 뉴스를 HTTP로 읽으므로 그 API를 stub한다.
+- **바깥과 닿는 지점만 stub이다.**
+  - 뉴스 provider는 collector가 부르는 provider 하나만 켜고, stub이 그 provider의 실제 응답 형식으로 답한다.
+  - LLM stub은 story 요약 응답 형식(`developmentKind` 포함)으로 답한다.
+  - TEI stub은 story-service가 부르는 경로(임베딩, 판정기)에 답한다. 판정 임계값은 운영 기본값 그대로 두고, stub이 입력 텍스트에서 결정적으로 벡터와 점수를 만들어 테스트마다 다른 story로 묶이게 한다.
+  - Qdrant는 실물 컨테이너다.
 - **vendor는 worker의 `MockNotificationSender`다.**
   - Slack·Discord 주소는 user-service가 `https://hooks.slack.com/`·`https://discord.com/api/webhooks/` 접두사를 강제하므로 stub URL을 바인딩에 넣을 수 없다.
   - 발송 결과는 세 곳으로 단언한다.
@@ -91,17 +97,18 @@ LLM·collector·user-service 호출은 테스트 JVM 안의 HTTP stub이 받는�
 - **사용자 등록·바인딩·구독은 user-service의 실제 API로 한다.**
   - 공개 API는 JWT가 필요하고 비밀번호 로그인이 없으므로, 테스트가 user-service에 넘긴 secret으로 access token을 직접 만든다.
   - DB에 직접 넣는 방식은 도메인 검증을 거치지 않으므로 쓰지 않는다.
-- **단언의 앵커는 `requestId = "sum:{summaryId}:u:{userId}:c:{channel}"`이다 (ADR 025).**
-  - `summaryId`는 broker의 `ai.summary.created` 레코드에서 읽는다.
+- **단언의 앵커는 `requestId = "sum:{storyId}:{version}:u:{userId}:c:{channel}"`이다 (ADR 035).**
+  - `storyId`와 `version`은 broker의 `ai.summary.created` 레코드에서 읽는다.
 
-시나리오는 넷이다.
+시나리오는 다섯이다.
 
-1. 요약 알림이 3채널로 `SENT`.
-2. 접수 뒤 바인딩이 없는 수신자는 `SUPPRESSED`.
+1. 수집에서 발송까지: 기사 수집 -> story 조립 -> story 요약 -> 요약 알림이 3채널로 `SENT`.
+2. 수신자당 한 통: 한 사용자가 같은 story의 키워드 둘을 같은 채널로 구독해도 story 한 버전에 한 통이고, 본문 머리에 두 키워드의 `displayName`이 들어간다.
 3. 같은 요약 이벤트를 다시 넣어도 접수가 늘지 않음 (routing 멱등).
-4. 키워드 격리 알림이 관리자에게 감.
+4. 접수 뒤 바인딩이 없는 수신자는 `SUPPRESSED`.
+5. story 격리 알림이 관리자에게 감.
 
-스킵 시나리오(2)는 접수 이벤트를 외부 producer처럼 직접 넣는다.
+스킵 시나리오(4)는 접수 이벤트를 외부 producer처럼 직접 넣는다.
 user-service의 구독 조회가 ACTIVE 바인딩이 있는 채널만 돌려주므로 routing은 이 경우를 만들지 않는다.
 접수와 발송 사이에 바인딩이 해지된 상황은 그렇게만 재현된다.
 
@@ -110,7 +117,7 @@ user-service의 구독 조회가 ACTIVE 바인딩이 있는 채널만 돌려주�
 `./gradlew test`는 그대로 서비스·계약 모듈만 돈다.
 e2e는 `./gradlew :e2e-test:e2eTest`로 따로 돈다.
 
-- 컨테이너 아홉 개를 띄우는 데 몇 분이 걸려 평소의 `./gradlew test`에 넣기에는 무겁다.
+- 컨테이너 열두 개를 띄우는 데 몇 분이 걸려 평소의 `./gradlew test`에 넣기에는 무겁다.
 - JUnit 태그로 거르는 안은 아홉 모듈 전부에 필터를 심어야 하고 선례가 없다.
   task 분리는 모듈 하나의 빌드 파일로 닫힌다.
 - CI가 생기면 별도 job으로 붙인다.
@@ -162,7 +169,7 @@ ai-service는 옮겼고 worker의 `*RealIntegrationTest`는 같은 규칙으로 
 
 ## 검토한 대안
 
-- **WireMock 컨테이너로 LLM·collector를 stub한다.**
+- **WireMock 컨테이너로 LLM·뉴스 provider·TEI를 stub한다.**
   - 서비스 컨테이너가 host를 거치지 않아도 되지만 새 의존성이 생긴다.
   - 기존 `TestVendorServer` 패턴(reactor-netty, 의존성 없음)으로 충분하다.
     host port는 `Testcontainers.exposeHostPorts`로 연다.
@@ -178,20 +185,21 @@ ai-service는 옮겼고 worker의 `*RealIntegrationTest`는 같은 규칙으로 
 ## 트레이드오프
 
 - 장점:
-  - 계약 topic과 API만으로 이어진 다섯 프로세스가 실제로 한 사이클을 완주하는지 코드로 확인한다.
+  - 계약 topic과 API만으로 이어진 일곱 프로세스가 실제로 한 사이클을 완주하는지 코드로 확인한다.
   - 어느 서비스 모듈도 테스트 모듈을 모른다.
-  - 홉별 멱등(요약 재사용, routing 중복 fan-out 방지)이 fake가 아니라 실제 저장소와 broker 위에서 증명된다.
+  - 홉별 멱등(story 버전, routing 중복 fan-out 방지)이 fake가 아니라 실제 저장소와 broker 위에서 증명된다.
 - 단점:
   - e2e 한 번이 몇 분이라 매 커밋 검증 루프에는 들어가지 않는다.
     계약이 깨졌을 때 알아채는 시점이 늦다.
   - 서비스마다 환경변수 이름이 이 모듈에 박힌다.
     yaml 키가 바뀌면 e2e가 기동 단계에서 깨지는데, 그것이 이 테스트의 역할이기도 하다.
   - vendor를 mock으로 보내므로 실제 webhook 형식은 스모크에서만 확인된다.
+  - TEI가 stub이라 실제 임베딩 모델의 판정은 story-service의 `realTest`와 스모크에서만 확인된다.
 
 ## 운영 제약
 
 - e2e와 통합 테스트는 Docker Desktop과 `DOCKER_HOST` 지정이 필요하다 (`docs/테스트전략.md`).
-- 스모크를 같은 뉴스로 다시 돌리면 `summaryId`가 같아 이벤트가 나지 않고, 24시간 안이면 `notification:sent:{requestId}` 가드에 걸린다.
+- 스모크를 같은 뉴스로 다시 돌리면 collector가 URL로 걸러 새 기사가 없으므로 요약도 이벤트도 나지 않고, 24시간 안이면 `notification:sent:{requestId}` 가드에 걸린다.
   재실행 절차는 스모크 문서에 있다.
 
 ## 후속

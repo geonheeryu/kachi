@@ -1,15 +1,14 @@
-# 021. ai-service LLM 실패 분류와 서킷 브레이커, failover, 키워드 격리
+# 021. ai-service LLM 실패 분류와 서킷 브레이커, failover, 요약 대상 격리
 
 ## 배경
 
-ai-service는 외부 LLM을 부르는 유일한 서비스다. scheduler(ADR 020)가 10분마다 활성 키워드 수만큼 호출을 내보내고, 실패한 키워드는 다음 tick이 같은 구간을 다시 처리한다.
+ai-service는 외부 LLM을 부르는 유일한 서비스다. story 요약(ADR 034)과 키워드 확장(ADR 020)이 LLM을 부른다.
 
 처음에는 이 경로에 실패를 구분하는 장치가 없었다.
 
 - HTTP 오류가 분류되지 않아 429든 401이든 프레임워크 예외 그대로 application 계층까지 올라왔다. `Retry-After`는 읽히지 않았다.
 - 실행 기록에는 `UNKNOWN`만 쌓였다.
 - 모든 실패가 키워드 탓으로 세어져, provider rate limit이 3 tick 이어지면 멀쩡한 키워드가 전부 격리됐다. 격리는 자동 해제가 없다.
-- 뉴스 0건이 실패로 집계돼 watermark를 붙잡았다. 뉴스가 뜸한 키워드 하나가 전체 진행을 정체시키고 스스로 격리됐다.
 - 장애 중에도 남은 키워드가 각자 한 번씩 더 429를 받았다. 죽은 provider로 나가는 호출을 막는 장치가 없었다.
 
 이후 전체 사이클 스모크(ADR 029)에서 한 축(`retryable`) 분류의 한계가 드러났다.
@@ -33,8 +32,8 @@ LlmFailure
 판단 축은 둘이고 모두 `code`에서 파생한다. 코드와 어긋난 축을 가진 실패를 만들 수 없게 하기 위해서다.
 `LlmFailureCode`는 application 예외의 에러 코드 규약 `AiErrorCode`를 구현하지 않는다. 두 축이 그 규약 밖에 남고, 얻는 것은 `defaultMessage`를 `message`로 바꾸는 것뿐이다.
 
-- 책임 `LlmFailureAttribution`: 이 실패의 책임이 어디 있는가. `INPUT`(이 키워드의 요청·응답), `MODEL`(모델 하나), `PROVIDER`(계정과 endpoint), `NONE`(우리 가드가 호출 전에 막음).
-- 지속 `transient`: 다음 tick이나 다음 후보에서 저절로 풀리는가.
+- 책임 `LlmFailureAttribution`: 이 실패의 책임이 어디 있는가. `INPUT`(이 요약 대상의 요청·응답), `MODEL`(모델 하나), `PROVIDER`(계정과 endpoint), `NONE`(우리 가드가 호출 전에 막음).
+- 지속 `transient`: 다음 시도나 다음 후보에서 저절로 풀리는가.
 
 코드마다의 책임과 지속은 ADR 030의 표에 있다. 이 문서는 그 두 축을 소비처가 어떻게 쓰는지 정한다.
 
@@ -57,7 +56,7 @@ notification-core의 `RetryFailure`(ADR 014)와 어휘를 맞추되 코드 의�
 | 모델 hold `holdsModel` | MODEL이고 transient가 아님 | 제공 종료된 모델은 60초 뒤 돌아오지 않는다 |
 | 제공자 hold `holdsProvider` | PROVIDER이고 transient가 아님 | 계정 문제는 그 제공자의 모든 모델이 같다 |
 | cooldown | 429 | provider가 지시한 대기 시간은 비율로 열리는 서킷이 표현하지 못한다 |
-| 키워드 격리 카운트 | 시도한 후보 전부가 INPUT | 격리의 오판 비용이 호출 비용보다 크다 |
+| story 격리 카운트 | 시도한 후보 전부가 INPUT | 격리의 오판 비용이 호출 비용보다 크다 |
 | tick 조기 중단 | 실제 호출이 한 건도 나갈 수 없음 | 결과가 확정된 루프는 돌지 않는다 |
 
 ### provider 예외 매핑
@@ -70,7 +69,7 @@ notification-core의 `RetryFailure`(ADR 014)와 어휘를 맞추되 코드 의�
 
 ### 실패 원인 기록
 
-`SummarizeNewsService`가 `LlmFailure`를 `AiFailureReason`으로 옮겨 `AiRun`에 남긴다.
+`SummarizeStoryService`가 `LlmFailure`를 `AiFailureReason`으로 옮겨 story 격리 기록의 `lastFailureReason`에 남긴다.
 
 | LlmFailureCode | AiFailureReason |
 | --- | --- |
@@ -87,54 +86,34 @@ notification-core의 `RetryFailure`(ADR 014)와 어휘를 맞추되 코드 의�
 
 LLM 경로 밖의 실패도 함께 정한다.
 
-| 예외 | AiFailureReason | 키워드 탓 |
+| 예외 | AiFailureReason | story 탓 |
 | --- | --- | --- |
-| `NewsReaderException`, `KeywordReaderException` | `SERVER_ERROR` | 아니오 |
 | `IllegalArgumentException` | `INVALID_RESPONSE` | 예 |
-| 그 외 | `UNKNOWN` | 아니오 |
+| 그 외 | 기록하지 않는다 | 아니오 |
 
-- `IllegalArgumentException`은 도메인 불변식 위반이다. `NewsSummary.create`가 거부하는 값은 이 키워드의 입력이나 응답에서 온다.
-- 판별할 수 없는 실패는 인프라 쪽으로 본다. 잘못 세면 정상 키워드가 영구 격리되고, 놓치면 다음 실행이 다시 시도할 뿐이다.
+- `IllegalArgumentException`은 도메인 불변식 위반이다. `StorySummary.create`가 거부하는 값은 이 story의 입력이나 응답에서 온다.
+- 판별할 수 없는 실패는 인프라 쪽으로 본다. 잘못 세면 정상 story가 영구 격리되고, 놓치면 다음 시도가 다시 부를 뿐이다.
 - `MODEL_NOT_FOUND`·`ACCOUNT_ERROR`는 `ai-contract`에 없어 격리 이벤트에는 `CLIENT_ERROR`로 나간다. 격리 카운트는 INPUT 합의에서만 오르므로 이 두 값이 격리 이벤트에 실릴 경로는 없다.
-- `EMPTY_INPUT`은 새로 기록하지 않는다. 저장된 실행 기록을 읽기 위해 상수만 남긴다.
 
 ### 격리 카운트 규칙
 
-`recordKeywordFailure()`는 키워드 탓 실패에서만 호출한다.
+story 격리 카운트(`StoryQuarantine.recordFailure()`)는 story 탓 실패에서만 올린다.
 
-- LLM 실패는 `LlmProviderException.allInput`, 즉 시도한 후보 전부가 INPUT으로 끝났을 때만 키워드 탓이다.
-- 400과 JSON 계약 위반은 키워드 탓일 수도 모델 탓일 수도 있다. 후보 하나의 판정으로 세지 않는다.
-- 그 밖의 실패는 카운트를 갱신하지 않고 quarantine 문서도 만들지 않는다. WARN 로그만 남긴다.
-- 인프라 실패도 `AiRun`에는 실패로 집계되어 watermark를 붙잡는다. 재시도는 다음 tick이 담당하고, 이미 성공한 키워드는 `newsHash`로 재사용된다(ADR 011).
+- LLM 실패는 `LlmProviderException.allInput`, 즉 시도한 후보 전부가 INPUT으로 끝났을 때만 story 탓이다.
+- 400과 JSON 계약 위반은 story 탓일 수도 모델 탓일 수도 있다. 후보 하나의 판정으로 세지 않는다.
+- 그 밖의 실패는 카운트를 갱신하지 않고 quarantine 문서도 만들지 않는다. 예외로 올라간다.
+- 소비 경로의 예외는 같은 offset을 다시 처리하게 하고, tick 경로의 예외는 그 story를 다음 tick으로 미룬다(ADR 034). 미요약 기사는 그대로 남는다.
 
 격리는 재시도로 해결되지 않는 실패를 걷어내는 장치다(ADR 020).
-rate limit과 timeout은 다음 tick이 해결하므로, 세면 격리가 해결책이 아닌 문제에 개입하고 그 개입은 영구적이다.
-
-### skip과 실패의 분리
-
-요약할 입력이 없는 키워드는 실패가 아니라 skip이다.
-
-```text
-articles.isEmpty()  -> SKIPPED (NO_INPUT)
-                       실패 아님, 격리 카운트 아님, watermark 전진을 막지 않음
-```
-
-- `articles.isEmpty()`가 되는 경로는 collector가 정상 200으로 빈 배열을 준 경우뿐이다. collector의 오류와 timeout은 `NewsReaderException`으로 먼저 걸러진다.
-- `AiRun`은 `succeededCount`·`failureCount`·`skippedCount`와 `skipReason`(`NO_INPUT`·`PROVIDER_UNAVAILABLE`)을 갖는다.
-- 실행 상태는 실패와 성공이 섞이면 `PARTIALLY_FAILED`, 실패만 있으면 `FAILED`, 성공이나 skip이 있으면 `SUCCEEDED`, 요청 키워드가 0건이면 `FAILED`다.
-- watermark 전진 조건은 `failureCount == 0`이다. skip은 전진을 막지 않는다.
-
-누락이 생기지 않는 이유는 collector가 `collectedAt` 기준으로 조회하기 때문이다(ADR 020).
-수집 시각은 거의 단조 증가라 지나간 구간에 뉴스가 소급되지 않고, 늦은 수집은 다음 window와 `overlap`이 흡수한다.
+rate limit과 timeout은 다음 시도가 해결하므로, 세면 격리가 해결책이 아닌 문제에 개입하고 그 개입은 영구적이다.
 
 ### tick 조기 중단
 
-키워드 하나의 실패가 실제 호출 없이 끝났으면 남은 키워드를 호출하지 않고 `PROVIDER_UNAVAILABLE`로 skip한다.
+story 요약 tick에서 story 하나의 실패가 실제 호출 없이 끝났으면 남은 story를 호출하지 않고 건너뛴다.
 
 - 실제 호출이 한 건도 나가지 못했다는 것은 후보 전부가 서킷·cooldown·hold라는 뜻이고, 이번 tick 안에서 풀리지 않는다.
-- 429 한 건은 중단 사유가 아니다. 한 모델이 rate limit이어도 다른 후보나 다음 키워드는 시도해 볼 수 있다.
-- 중단을 유발한 키워드는 실패 1건으로 남으므로 `failureCount > 0`이 성립해 watermark가 유지된다.
-  - 다음 tick이 같은 구간을 다시 처리한다. 중단은 작업을 버리는 것이 아니라 미루는 것이다.
+- 429 한 건은 중단 사유가 아니다. 한 모델이 rate limit이어도 다른 후보나 다음 story는 시도해 볼 수 있다.
+- 건너뛴 story는 미요약 기사를 그대로 가지므로 다음 tick이 다시 고른다. 중단은 작업을 버리는 것이 아니라 미루는 것이다.
 
 ### 모델 단위 가드
 
@@ -165,28 +144,27 @@ articles.isEmpty()  -> SKIPPED (NO_INPUT)
 후보 소진 -> LlmProviderException(failure = 마지막 실제 호출의 실패, attempts = 실제 호출 전부)
 ```
 
-- 순서는 설정 그대로다. 순서가 고정이어야 요약 선조회 plan과 실제 첫 호출이 같다(ADR 011).
+- 순서는 설정 그대로다.
 - 차단·hold·cooldown 상태는 in-process에 둔다. in-process에 두지 않는 것은 재시도 루프이고, 호출 차단은 in-process가 맞는 자리다.
 - in-process 재시도(`RetryOperator`)는 쓰지 않는다.
-  - tick 재시도와 곱해져 호출 수가 `키워드 × 시도 × tick`이 되고, 시도 흔적이 `AiRun`과 watermark 밖에는 남지 않는다.
+  - 재전달·tick 재시도와 곱해져 호출 수가 `대상 × 시도 × 재시도`가 되고, 시도 흔적이 영속 상태에 남지 않는다.
   - 재시도 구동은 영속 상태에 둔다.
 
 ## 결과
 
-- 죽은 모델이나 결제 문제가 키워드를 격리시키지 않는다. 그 모델이나 제공자만 빠지고 다음 후보로 간다.
-- provider rate limit 3 tick으로 정상 키워드가 영구 격리되는 경로가 없다.
-- 뉴스가 뜸한 키워드가 watermark를 정체시키지 않는다.
-- `AiRun`이 성공·실패·skip과 실패 원인을 구분해, 실행 하나를 보고 조치가 필요한지 알 수 있다.
+- 죽은 모델이나 결제 문제가 story를 격리시키지 않는다. 그 모델이나 제공자만 빠지고 다음 후보로 간다.
+- provider rate limit이 이어져도 정상 story가 영구 격리되는 경로가 없다.
+- story 격리 기록이 마지막 실패 원인을 남겨, 격리된 story를 보고 조치가 필요한지 알 수 있다.
 - 호출할 수 있는 모델이 없으면 이번 tick의 호출이 즉시 멈춘다.
 
 ## 트레이드오프
 
-- 나쁜 키워드 하나가 격리되기까지 tick당 후보 수만큼 호출이 든다. 격리 오판의 비용이 더 크다.
+- 나쁜 story 하나가 격리되기까지 시도당 후보 수만큼 호출이 든다. 격리 오판의 비용이 더 크다.
 - 서킷·cooldown·hold는 인스턴스마다 독립이다. 인스턴스가 늘면 Redis로 옮긴다(ADR 030 후속).
 
 ## 제외한 것
 
 - retry budget(ADR 018): 재시도가 tick 단위라 분모가 고정이고, 서킷과 조기 중단이 총량을 잡는다. 관측 지표 없이 비율을 정하면 근거 없는 숫자다.
-- bulkhead와 slow start: tick 안의 호출은 순차라 동시성이 1이다. 키워드 병렬 호출을 도입하면 함께 본다.
+- bulkhead와 slow start: tick 안의 호출은 순차라 동시성이 1이다. story 병렬 요약을 도입하면 함께 본다.
 - token/cost budget: 사용량 데이터가 쌓인 뒤 관측과 함께 다룬다.
 - provider별 metric 노출: observability(ADR 019) 이후다.

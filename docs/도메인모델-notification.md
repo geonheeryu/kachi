@@ -7,7 +7,7 @@ notification-routing(fan-out)은 자기 도메인과 유스케이스를 갖는 �
 
 관련 결정: ADR 012(모듈 설계), 013(outbox dispatch flow), 014(재시도 분류),
 015(outbox 발행 runtime), 016(vendor sender 구조), 017(Mongo 트랜잭션 전제),
-018(재시도 폭주 방지), 024(aggregate 불변화와 finalize CAS), 027(알림 라우팅), 028(발송 직전 주소 조회와 스킵).
+018(재시도 폭주 방지), 024(aggregate 불변화와 finalize CAS), 027(알림 라우팅), 028(발송 직전 주소 조회와 스킵), 035(story 요약 소비와 storyId 멱등).
 
 이 컨텍스트의 상태 전이 aggregate는 불변이다. 전이 메서드는 전이 결과를 새 인스턴스로 반환하고 전이 전 인스턴스는 그대로 남는다.
 전이 가드는 최종 방어선이며, 외부 side effect(Kafka 발행, vendor 호출) 뒤의 결과 확정은 전이 전 인스턴스가 들고 있던 claim을
@@ -29,7 +29,8 @@ _Aggregate Root_
 - `channel`: `NotificationChannel` 발송 채널
 - `recipientId`: 수신자 식별자(user-service 사용자 id). 주소(`address`)가 아니며 알림에는 주소가 남지 않는다
 - `message`: 발송 메시지 (null 허용, 빈 문자열 불가)
-- `origin`: `NotificationOrigin` 출처(summaryId, keyword, userId). 요청 계약에 실려 온 알림만 값을 가진다
+- `origin`: `NotificationOrigin` 출처(summaryId, storyId, version, keywords, userId). 요청 계약에 실려 온 알림만 값을 가진다
+  - keywords는 story의 키워드 중 그 수신자가 구독한 canonicalKey다
 - `requestedAt`: 최초 접수 시각
 - `status`: `NotificationStatus` 알림 상태
 - `failureReason`: 마지막 실패 사유
@@ -261,7 +262,7 @@ _Value Object_
 
 ## 라우팅
 
-notification-routing 모듈의 도메인이다. `ai.summary.created`·`ai.keyword.quarantined` 한 건을 수신자 x 채널만큼의 `notification.requested`로 펼친 기록을 갖는다.
+notification-routing 모듈의 도메인이다. `ai.summary.created`·`ai.story.quarantined` 한 건을 수신자 x 채널만큼의 `notification.requested`로 fan-out한 기록을 갖는다.
 
 ### 라우팅 job(RoutingJob)
 
@@ -274,30 +275,36 @@ _Aggregate Root_
 - `id`: `RoutingJobId`
 - `eventKey`: 이벤트 식별 키. 유일하다
 - `kind`: `RoutingJobKind`
-- `keyword`: 이벤트의 키워드
+- `storyId`: 이벤트의 story
 - `status`: `RoutingJobStatus`
-- `targetCount`: 펼친 대상 수 / `publishedCount`: 접수 topic으로 발행한 건수
+- `cursor`: 다음에 읽을 수신자 페이지의 커서. `STARTED`에서 null이면 첫 페이지부터다
+- `targetCount`: fan-out한 대상 수 누계 / `publishedCount`: 접수 topic으로 발행한 건수 누계
 - `createdAt` / `updatedAt` / `completedAt`
+
+eventKey는 요약이면 `{storyId}:{version}`, 격리면 `{quarantineId}:{quarantinedAt epoch millis}`다.
 
 #### 행위(Behaviors)
 
-- `static start(eventKey, kind, keyword, now)`: `STARTED`로 만든다. 두 건수는 0이다
+- `static start(eventKey, kind, storyId, now)`: `STARTED`로 만든다. cursor는 null이고 두 건수는 0이다
 - `static restore(...)`: 저장소 snapshot을 복원한다
-- `complete(targetCount, publishedCount, now)`: `STARTED -> COMPLETED`
+- `advance(cursor, targetDelta, publishedDelta, now)`: `STARTED -> STARTED`. 한 페이지를 끝내고 cursor와 누계를 옮긴다
+- `complete(targetDelta, publishedDelta, now)`: `STARTED -> COMPLETED`. 마지막 페이지의 delta를 더하고 cursor를 null로 한다
 
 #### 규칙(Rules)
 
-- `eventKey`와 `keyword`는 non-blank다.
+- `eventKey`와 `storyId`는 non-blank다.
+- `advance`의 cursor는 non-blank이고 delta는 0 이상이다.
 - `publishedCount`는 0 이상 `targetCount` 이하다.
-- `completedAt`은 `COMPLETED`일 때만 있다.
-- 같은 이벤트를 다시 받으면 `COMPLETED`는 다시 라우팅하지 않고 `STARTED`는 처음부터 다시 발행한다.
+- `completedAt`은 `COMPLETED`일 때만 있고, `COMPLETED`의 cursor는 null이다.
+- 같은 이벤트를 다시 받으면 `COMPLETED`는 다시 라우팅하지 않고 `STARTED`는 저장된 cursor부터 잇는다.
+- 전이 저장은 `_id`, `status = STARTED`, `cursor = 전이 전 값`을 조건으로 한 조건부 갱신이다. 조건이 어긋나면 예외이고, 진행 상태는 뒤로 가지 않는다.
 
 ### 라우팅 job 종류(RoutingJobKind)
 
 _Enum_
 
-- `SUMMARY`: 요약 생성. 키워드 구독자 x 채널로 펼친다
-- `QUARANTINE`: 키워드 격리. 관리자 x 채널로 펼친다
+- `SUMMARY`: story 요약 버전 생성. story의 키워드를 구독한 수신자 x 채널로 fan-out한다
+- `QUARANTINE`: story 격리. 관리자 x 채널로 fan-out한다
 
 ### 라우팅 job 상태(RoutingJobStatus)
 
