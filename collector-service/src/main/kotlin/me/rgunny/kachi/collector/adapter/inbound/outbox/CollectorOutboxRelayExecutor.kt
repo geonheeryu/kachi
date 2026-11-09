@@ -1,8 +1,8 @@
 package me.rgunny.kachi.collector.adapter.inbound.outbox
 
 import me.rgunny.kachi.collector.application.port.inbound.outbox.RelayCollectorOutboxUseCase
-import me.rgunny.kachi.collector.application.port.outbound.lock.CollectorExecutionLock
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.CollectorExecutionLock
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockPort
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component

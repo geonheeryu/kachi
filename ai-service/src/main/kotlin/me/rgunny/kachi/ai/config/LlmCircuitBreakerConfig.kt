@@ -45,8 +45,7 @@ class LlmCircuitBreakerConfig {
             .slowCallRateThreshold(properties.slowCallRateThreshold)
             .waitDurationInOpenState(properties.waitDurationInOpenState)
             .permittedNumberOfCallsInHalfOpenState(properties.permittedNumberOfCallsInHalfOpenState)
-            // 차단이 만든 실패는 가드가 집계 구간에 들어가기 전에 던지므로 지금은 여기 닿지 않는다.
-            // 그 호출 순서에 기대지 않고 판정을 남겨 둔다. 만약 도달하면 차단이 회로를 더 여는 문제가 생긴다.
+            // 차단이 만든 실패 제외(가드가 집계 전에 던지지만 호출 순서에 기대지 않음)
             .recordException { it is LlmProviderException && it.failure.recordsInCircuit }
             .build()
     }

@@ -9,7 +9,9 @@ import me.rgunny.kachi.user.adapter.inbound.web.SubscriptionController
 import me.rgunny.kachi.user.adapter.inbound.web.UserController
 import me.rgunny.kachi.user.adapter.inbound.web.fake.WebMvcFakeOAuth2Config
 import me.rgunny.kachi.user.adapter.inbound.web.fake.WebMvcFakeUseCaseConfig
-import me.rgunny.kachi.user.adapter.inbound.web.security.JwtTokenProvider
+import me.rgunny.kachi.user.adapter.outbound.auth.JwtTokenProvider
+import me.rgunny.kachi.user.application.port.inbound.auth.AuthenticateAccessTokenUseCase
+import me.rgunny.kachi.user.application.service.AccessTokenAuthenticationService
 import me.rgunny.kachi.user.domain.SubscriptionId
 import me.rgunny.kachi.user.domain.UserId
 import me.rgunny.kachi.user.domain.UserRole
@@ -185,6 +187,19 @@ class SecurityConfigTest @Autowired constructor(
                 accept = MediaType.APPLICATION_JSON
             }.andExpect {
                 status { isOk() }
+            }
+        }
+
+        @Test
+        @DisplayName("내 정보 조회 API는 refresh token으로 접근할 수 없다")
+        fun rejectGetMeApiWithRefreshToken() {
+            val token = jwtTokenProvider.createRefreshToken(UserId.newId())
+
+            mockMvc.get("/api/v1/me") {
+                header("Authorization", "Bearer ${token.value}")
+                accept = MediaType.APPLICATION_JSON
+            }.andExpect {
+                status { isForbidden() }
             }
         }
 
@@ -416,5 +431,9 @@ class SecurityConfigTest @Autowired constructor(
             )
         }
 
+        @Bean
+        fun authenticateAccessTokenUseCase(jwtTokenProvider: JwtTokenProvider): AuthenticateAccessTokenUseCase {
+            return AccessTokenAuthenticationService(jwtTokenProvider)
+        }
     }
 }

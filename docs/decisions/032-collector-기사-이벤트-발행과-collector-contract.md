@@ -48,11 +48,11 @@ Fowler가 Event-Carried State Transfer라고 부른 방식이고, ADR 031이 정
 
 | 규칙 | 예 |
 | --- | --- |
-| scheme·host 소문자화, 기본 포트 제거, fragment 제거 | `HTTPS://Kachi.COM:443/news/1#top` → `https://kachi.com/news/1` |
-| 추적 파라미터 제거 (`utm_*`, `fbclid`, `gclid`, `dclid`, `yclid`, `msclkid`, `igshid`, `mc_cid`, `mc_eid`, `ref`, `ref_src`, `_ga`, `_gl`) | `?utm_source=x&id=1` → `?id=1` |
-| 남은 파라미터를 키·값 순으로 정렬 | `?page=2&id=1` → `?id=1&page=2` |
-| 끝 슬래시 제거 | `/news/1/` → `/news/1` |
-| AMP 경로와 `amp.` 서브도메인 원본화 | `/news/1/amp` → `/news/1`, `amp.kachi.com` → `kachi.com` |
+| scheme·host 소문자화, 기본 포트 제거, fragment 제거 | `HTTPS://Kachi.COM:443/news/1#top` -> `https://kachi.com/news/1` |
+| 추적 파라미터 제거 (`utm_*`, `fbclid`, `gclid`, `dclid`, `yclid`, `msclkid`, `igshid`, `mc_cid`, `mc_eid`, `ref`, `ref_src`, `_ga`, `_gl`) | `?utm_source=x&id=1` -> `?id=1` |
+| 남은 파라미터를 키·값 순으로 정렬 | `?page=2&id=1` -> `?id=1&page=2` |
+| 끝 슬래시 제거 | `/news/1/` -> `/news/1` |
+| AMP 경로와 `amp.` 서브도메인 원본화 | `/news/1/amp` -> `/news/1`, `amp.kachi.com` -> `kachi.com` |
 
 파싱할 수 없는 URL은 손대지 않는다. 그런 URL끼리는 원문이 같을 때만 같은 해시다.
 `www.` 제거와 모바일 서브도메인 원본화는 하지 않는다. 다른 페이지를 같은 것으로 만들 위험이 이득보다 크다.
@@ -65,7 +65,7 @@ Fowler가 Event-Carried State Transfer라고 부른 방식이고, ADR 031이 정
 ai-service의 outbox·relay(ADR 022)와 같은 구조를 collector에 둔다.
 
 - 기사 insert와 outbox insert는 한 Mongo 트랜잭션이다. `(source, urlHash)` unique 충돌은 트랜잭션 전체를 되돌리므로 중복 기사의 outbox 행은 남지 않는다.
-- relay는 PENDING 행을 claim → 발행 → finalize CAS로 옮기고, visibility timeout이 지난 PUBLISHING 행을 회수한다. 실패 분류(retryable / non-retryable)와 DEAD·복구 API도 ADR 022·023과 같다.
+- relay는 PENDING 행을 claim -> 발행 -> finalize CAS로 옮기고, visibility timeout이 지난 PUBLISHING 행을 회수한다. 실패 분류(retryable / non-retryable)와 DEAD·복구 API도 ADR 022·023과 같다.
 - Mongo 트랜잭션은 replica set 전제다(ADR 017). collector의 로컬·테스트 설정도 replica set으로 맞춘다.
 
 bounded context 간 코드 의존 금지(ADR 021)가 outbox에도 적용된다. 세 컨텍스트(notification, ai, collector)가 각자 갖는다.

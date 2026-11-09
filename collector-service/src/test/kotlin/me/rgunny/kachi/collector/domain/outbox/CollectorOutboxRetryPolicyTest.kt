@@ -44,7 +44,7 @@ class CollectorOutboxRetryPolicyTest {
     fun spreadBackoffWithinJitterRange() {
         val jittered = policy(jitterRatio = 0.2, random = Random(SEED))
 
-        // baseDelay 1s, ratio 0.2 → 800ms ~ 1200ms
+        // baseDelay 1s, ratio 0.2 -> 800ms ~ 1200ms
         repeat(50) {
             val delay = jittered.backoff(1).toMillis()
             assertTrue(delay in 800..1200, "delay=$delay")

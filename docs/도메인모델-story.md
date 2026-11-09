@@ -1,8 +1,10 @@
 # Story 컨텍스트 도메인 모델
 
 story-service의 도메인 모델이다. collector가 발행한 기사를 같은 사건 단위의 story로 조립하고,
-기사의 소속과 판정 기록을 정본으로 갖는다(ADR 031·033).
+기사의 소속과 판정 기록을 정본으로 갖는다.
 공통 관례는 [도메인모델.md](도메인모델.md)를 따른다.
+
+관련 결정: ADR 022(outbox와 이벤트 발행 보장), 030(실패 분류의 귀속·지속 두 축), 031(요약 단위를 story로), 033(story-service 조립).
 
 기사 사실(제목·발췌문·URL 등)의 정본은 collector다. 이 컨텍스트의 기사는 임베딩 입력과 재처리를 위한 사본이다.
 
@@ -38,10 +40,13 @@ _Aggregate Root_
 
 #### 규칙(Rules)
 
-- 불변이며 전이 메서드는 version을 하나 올린 새 인스턴스를 반환한다. 저장소는 직전 version을 조건으로 쓴다(CAS).
-- 전이는 OPEN에서만 가능하다. CLOSED는 종단 상태이고, 닫힌 뒤 온 같은 사건의 기사는 새 story가 되어 `parentStoryId`로 이어진다.
-- `attach`·`absorb`는 centroid의 임베딩 모델이 같아야 한다. 다른 모델의 벡터는 평균할 수 없다.
-- `mergedInto`는 CLOSED에서만, `closedAt`은 CLOSED와 함께만 존재한다. 자기 자신을 흡수하거나 자기 자신의 후속일 수 없다.
+- 불변이며 전이 메서드는 version을 하나 올린 새 인스턴스를 반환한다.
+- 저장소는 직전 version을 조건으로 쓴다(CAS).
+- 전이는 OPEN에서만 가능하다. CLOSED는 종단 상태다.
+- 닫힌 뒤 온 같은 사건의 기사는 새 story가 되어 `parentStoryId`로 이어진다.
+- `attach`·`absorb`는 centroid의 임베딩 모델이 같아야 한다.
+- `mergedInto`는 CLOSED에서만, `closedAt`은 CLOSED와 함께만 존재한다.
+- 자기 자신을 흡수하거나 자기 자신의 후속일 수 없다.
 
 ### 스토리 식별자(StoryId)
 
@@ -90,7 +95,8 @@ _Aggregate Root_
 
 #### 규칙(Rules)
 
-- 사본이므로 제목·발췌문은 non-blank만 요구하고 collector의 정규화 규칙을 되풀이하지 않는다.
+- 사본이므로 제목·발췌문·URL은 non-blank만 요구하고 collector의 정규화 규칙을 되풀이하지 않는다.
+- `matchedKeywords`는 하나 이상이다.
 - `decision`은 붙인 시점의 기록이다. 생성 시점에는 merged 판정의 후보 story와 소속이 같아야 하지만, 병합·분리의 `reassign` 뒤에는 소속과 갈라지는 것이 정상이라 복원은 이를 검증하지 않는다.
 
 ### 기사 식별자(NewsId)
@@ -149,7 +155,8 @@ _Value Object_
 _Enum_
 
 - `BGE_M3`: code `bge-m3`, 1024차원
-- 정체(code·modelId·차원)는 enum, 주소·시간은 yaml이다(ADR 030 방식). `ofCode`는 모르는 코드면 실패한다
+- 정체(code·modelId·차원)는 enum이, 주소·시간은 yaml이 정한다
+- `ofCode`는 모르는 코드면 실패한다
 
 ### 판정기(StoryJudge)
 
@@ -160,14 +167,12 @@ _Enum_
 
 ## outbox 애그리거트
 
-collector·ai의 outbox와 같은 구조다(ADR 015·022·032·033). 컨텍스트 간 코드 공유 없이 각자 갖는다.
-
 ### 스토리 outbox(StoryOutbox)
 
 _Aggregate Root_
 
 - 발행해야 할 story 이벤트 1건과 그 발행 상태. `eventType`·`eventKey`·`partitionKey`·`payload`(생성 시점에 계약 JSON으로 고정)·`status`·`retryCount`·`nextRetryAt`·`claim` 등
-- 전이: PENDING → PUBLISHING(claim) → PUBLISHED | DEAD, DEAD → PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
+- 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, PUBLISHING -> PENDING(재시도 가능한 실패, 한도 미만), DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
 
 ### 발행 소유권(StoryOutboxClaim)
 
@@ -190,14 +195,14 @@ _Value Object_
 
 ## 실패 모델
 
-ADR 030의 두 축(귀속 attribution, 지속 transient)을 따른다. TEI와 Qdrant는 프로토콜이 달라 코드 표를 따로 둔다.
+실패는 귀속(attribution)과 지속(transient) 두 축으로 분류한다. TEI와 Qdrant는 프로토콜이 달라 코드 표를 따로 둔다.
 
 ### 추론 실패(InferenceFailure)
 
 - `code`: `InferenceFailureCode`(귀속·transient 내장), `target`: `InferenceTarget`(`EMBEDDING`·`JUDGE`), `message`, `statusCode?`
-- INPUT 귀속(400·413·422)은 기사 결함으로 DLT, 나머지는 재시도 대상이다(ADR 033)
+- INPUT 귀속(400·413·422)은 기사 결함으로 DLT, 나머지는 재시도 대상이다
 
 ### 후보 색인 실패(CandidateIndexFailure)
 
-- `code`: `CandidateIndexFailureCode`(gRPC status code에서 매핑), attribution·transient 두 축은 추론 실패와 같다
+- `code`: `CandidateIndexFailureCode`(gRPC status code에서 매핑, 귀속·transient 내장)
 - 색인 실패는 전부 재시도 대상이다. 색인은 파생 캐시라 유실돼도 재구축으로 돌아온다

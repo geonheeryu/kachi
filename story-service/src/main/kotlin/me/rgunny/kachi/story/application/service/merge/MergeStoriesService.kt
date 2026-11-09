@@ -9,8 +9,8 @@ import me.rgunny.kachi.story.application.port.inbound.merge.MergeStoryPairUseCas
 import me.rgunny.kachi.story.application.port.inbound.merge.model.MergeOpenStoriesResult
 import me.rgunny.kachi.story.application.port.inbound.merge.model.MergeStoryPairCommand
 import me.rgunny.kachi.story.application.port.inbound.merge.model.MergeStoryPairResult
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateQuery
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateQuery
 import me.rgunny.kachi.story.application.port.outbound.outbox.StoryOutboxEventSerializer
 import me.rgunny.kachi.story.application.port.outbound.outbox.model.StoryMergedEvent
 import me.rgunny.kachi.story.application.port.outbound.outbox.model.toOutbox

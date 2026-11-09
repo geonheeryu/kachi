@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # 전체 사이클 스모크용 기동 스크립트.
-# 인프라(core) → Mongo index → user-service → 나머지 서비스 순으로 띄운다.
+# 인프라(core) -> Mongo index -> user-service -> 나머지 서비스 순으로 띄운다.
 # ai-service의 LLM 후보는 local 프로파일이 같은 머신의 Ollama 하나로 둔다. 그 서버와 모델이 준비됐는지 먼저 본다.
 # 절차와 확인 항목은 docs/전체-사이클-스모크.md에 있다.
 
@@ -41,7 +41,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/cycle.sh <start|stop|status>
 
-  start   인프라(mysql redis mongo kafka) → Mongo index → user-service → 나머지 5개 순으로 띄운다.
+  start   인프라(mysql redis mongo kafka) -> Mongo index -> user-service -> 나머지 5개 순으로 띄운다.
   stop    서비스 6개를 내리고 인프라를 내린다.
   status  서비스와 인프라 상태를 본다.
 

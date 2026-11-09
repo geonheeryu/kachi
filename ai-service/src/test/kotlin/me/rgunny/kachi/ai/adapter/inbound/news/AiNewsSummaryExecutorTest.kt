@@ -6,7 +6,7 @@ import me.rgunny.kachi.ai.application.port.inbound.news.model.ExplicitSummaryWin
 import me.rgunny.kachi.ai.application.port.inbound.news.model.SummarizeNewsCommand
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.fake.BlockingSummarizeNewsUseCase
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.fake.FakeExecutionLockPort
 import me.rgunny.kachi.ai.fake.RecordingSummarizeNewsUseCase
 import me.rgunny.kachi.ai.fixture.AiTestFixture

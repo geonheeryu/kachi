@@ -4,7 +4,7 @@ import java.time.Clock
 import java.time.Instant
 import me.rgunny.kachi.story.application.port.inbound.cleanup.CleanupCandidateIndexUseCase
 import me.rgunny.kachi.story.application.port.inbound.cleanup.model.CleanupCandidateIndexResult
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
 import me.rgunny.kachi.story.application.service.assembly.AssemblyPolicy
 import org.springframework.stereotype.Service
 

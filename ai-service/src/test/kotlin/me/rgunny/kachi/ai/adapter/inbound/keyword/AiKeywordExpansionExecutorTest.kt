@@ -5,7 +5,7 @@ import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.ai.application.port.inbound.keyword.model.ExpandKeywordsCommand
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.fake.BlockingExpandKeywordsUseCase
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.fake.FakeExecutionLockPort
 import me.rgunny.kachi.ai.fake.RecordingExpandKeywordsUseCase
 import me.rgunny.kachi.ai.fixture.AiTestFixture

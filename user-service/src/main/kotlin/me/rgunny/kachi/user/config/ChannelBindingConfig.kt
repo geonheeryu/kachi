@@ -1,6 +1,6 @@
 package me.rgunny.kachi.user.config
 
-import me.rgunny.kachi.user.adapter.outbound.crypto.AesGcmAddressCipher
+import me.rgunny.kachi.user.adapter.outbound.binding.AesGcmAddressCipher
 import me.rgunny.kachi.user.application.port.outbound.binding.AddressCipherPort
 import me.rgunny.kachi.user.application.port.outbound.binding.ChannelBindingPersistencePort
 import me.rgunny.kachi.user.application.service.ActiveUserValidator

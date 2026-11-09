@@ -7,8 +7,8 @@ import me.rgunny.kachi.story.application.exception.StoryOperationException
 import me.rgunny.kachi.story.application.port.inbound.split.SplitStoryUseCase
 import me.rgunny.kachi.story.application.port.inbound.split.model.SplitStoryCommand
 import me.rgunny.kachi.story.application.port.inbound.split.model.SplitStoryResult
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.application.port.outbound.story.StoryArticlePersistencePort
 import me.rgunny.kachi.story.application.port.outbound.story.StoryPersistencePort
 import me.rgunny.kachi.story.application.port.outbound.story.StoryReorganizePersistencePort

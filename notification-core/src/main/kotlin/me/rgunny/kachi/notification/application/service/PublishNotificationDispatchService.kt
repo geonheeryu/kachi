@@ -4,7 +4,7 @@ import java.time.Clock
 import java.time.Instant
 import me.rgunny.kachi.notification.application.port.inbound.dispatch.PublishNotificationDispatchUseCase
 import me.rgunny.kachi.notification.application.port.inbound.dispatch.model.PublishNotificationDispatchResult
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationDispatchPublisher
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationDispatchPublisher
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationPublishPersistencePort
 import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationOutboxPersistencePort
 import me.rgunny.kachi.notification.domain.NotificationOutbox

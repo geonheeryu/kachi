@@ -42,7 +42,7 @@ class UserServiceClient(
         ).expect(200, 201)
     }
 
-    /** Telegram은 링크 발급 → 봇이 chat id를 연결하는 두 단계다. 두 번째 단계는 봇이 부르는 internal API를 그대로 부른다. */
+    /** Telegram은 링크 발급 -> 봇이 chat id를 연결하는 두 단계다. 두 번째 단계는 봇이 부르는 internal API를 그대로 부른다. */
     fun bindTelegram(user: RegisteredUser, chatId: String = (100_000_000L + (Math.random() * 899_999_999).toLong()).toString()) {
         val link = http.put("$baseUrl/api/v1/me/channel-bindings/TELEGRAM", bearer = user.accessToken).expect(200)
         val token = link.data.path("linkUrl").asText().substringAfter("?start=")

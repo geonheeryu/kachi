@@ -53,6 +53,7 @@ enum class AiExecutionLock(
 ) : ExecutionLockTarget {
     NEWS_SUMMARY("ai-service:news-summary", CLUSTER),
     KEYWORD_EXPANSION("ai-service:keyword-expansion", CLUSTER),
+    STORY_SUMMARY("ai-service:story-summary", CLUSTER),
     OUTBOX_RELAY("ai-service:outbox-relay", INSTANCE)
 }
 ```

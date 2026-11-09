@@ -12,5 +12,6 @@
     ".agents/skills/*/SKILL.md",
     ".claude/agents/*.md"
   ],
-  "lineLimits": { "AGENTS.md": 60 }
+  "lineLimits": { "AGENTS.md": 60 },
+  "proseExempt": ["docs/decisions/*.md", "docs/용어사전.md", "experiments/**/*.md"]
 }

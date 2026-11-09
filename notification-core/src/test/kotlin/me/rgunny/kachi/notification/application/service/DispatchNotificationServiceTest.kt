@@ -528,7 +528,7 @@ class DispatchNotificationServiceTest {
     @DisplayName("claim에 실패했는데 상태가 여전히 PUBLISHED면 중복이 아니라 재시도 신호를 낸다")
     fun claimMissOnPublishedNotificationIsNotReady() {
         // 발행 완료 반영 transaction이 커밋되기 전에 dispatch 레코드가 먼저 닿으면 claim은 실패하고 재조회는 PUBLISHED를 본다.
-        // 이를 중복으로 보고 ack하면 알림이 PUBLISHED에 영구히 남는다(e2e에서 드러난 결함, ADR 029).
+        // 이를 중복으로 보고 ack하면 알림이 PUBLISHED에 영구히 남는다(ADR 029).
         val notification = publishedNotification()
         val persistence = FakeNotificationPersistencePort().also {
             it.put(notification)

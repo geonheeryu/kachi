@@ -48,9 +48,9 @@ DJL PyTorch 엔진으로 두 모델을 돈다. 가중치는 TEI가 쓰는 것과
 조립 규칙 ③을 그대로 함수로 두고 θ 조합을 전수로 돌린다.
 
 ```
-cos ≥ θ_high            → 같은 story
-θ_low ≤ cos < θ_high    → 판정기 ≥ θ_judge 면 같은 story
-cos < θ_low             → 새 story
+cos ≥ θ_high            -> 같은 story
+θ_low ≤ cos < θ_high    -> 판정기 ≥ θ_judge 면 같은 story
+cos < θ_low             -> 새 story
 ```
 
 θ_high·θ_low ∈ {0.40 … 0.95, 0.05 간격}, θ_judge ∈ {0.30 … 0.95, 0.05 간격}.
@@ -60,12 +60,12 @@ cos < θ_low             → 새 story
 ## 실행
 
 ```sh
-./scripts/run.sh extract            # generated/ → goldset/pairs.jsonl
+./scripts/run.sh extract            # generated/ -> goldset/pairs.jsonl
 ./scripts/run.sh draft              # Ollama 초안, results/review.md
 ./scripts/run.sh score              # results/scores.jsonl
 ./scripts/run.sh review             # review.md를 코사인 순으로 다시 만든다
 #   review.md의 확정 칸에 같음/다름을 적는다
-./scripts/run.sh apply              # 확정 칸 → goldset/pairs.jsonl의 label
+./scripts/run.sh apply              # 확정 칸 -> goldset/pairs.jsonl의 label
 ./scripts/run.sh evaluate           # results/thresholds.md  (--use-draft: 초안 기준 참고용)
 ```
 

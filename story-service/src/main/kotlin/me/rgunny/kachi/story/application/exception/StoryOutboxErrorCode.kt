@@ -8,10 +8,6 @@ enum class StoryOutboxErrorCode(
         code = "OUTBOX_PUBLISH_FAILED",
         message = "outbox 이벤트 발행에 실패했습니다"
     ),
-    OUTBOX_PAYLOAD_INVALID(
-        code = "OUTBOX_PAYLOAD_INVALID",
-        message = "outbox 이벤트 payload가 발행 계약에 맞지 않습니다"
-    ),
     OUTBOX_NOT_FOUND(
         code = "OUTBOX_NOT_FOUND",
         message = "outbox 행이 없습니다"

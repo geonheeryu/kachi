@@ -49,7 +49,7 @@ import org.testcontainers.kafka.KafkaContainer
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * 요약 한 건이 LLM 호출 → 저장 → outbox → relay → broker까지 실제 인프라 위에서 완주하는지 본다.
+ * 요약 한 건이 LLM 호출 -> 저장 -> outbox -> relay -> broker까지 실제 인프라 위에서 완주하는지 본다.
  *
  * LLM·collector·user-service는 테스트 JVM 안의 stub이 받고, Mongo replica set과 Kafka는 컨테이너다.
  * broker에서 읽은 레코드는 소비자가 쓰는 계약 타입(`ai-contract`)으로 역직렬화한다. 그래야 계약 검증이다.

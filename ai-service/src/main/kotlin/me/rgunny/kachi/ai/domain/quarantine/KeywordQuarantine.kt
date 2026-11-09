@@ -9,7 +9,6 @@ import java.time.Instant
  * 키워드별 연속 실패 누적과 격리 상태.
  *
  * 반복 실패하는 키워드 하나가 window 전체의 진행을 막지 않도록, 그 키워드만 파이프라인에서 걷어낸다.
- * notification의 DEAD 처리(ADR 015)와 같은 방식이다.
  * 자세한 결정 배경은 docs/decisions/020-ai-service-scheduler-실행-모델과-요약-window.md 를 참고한다.
  */
 class KeywordQuarantine private constructor(

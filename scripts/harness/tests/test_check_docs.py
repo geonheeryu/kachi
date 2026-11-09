@@ -27,6 +27,31 @@ class GlobTests(unittest.TestCase):
         self.assertEqual(check_docs.line_count("a\nb"), 2)
 
 
+class ProseTests(unittest.TestCase):
+    def test_inline_example_in_bullet_fails(self):
+        errors = check_docs.prose_line_errors("d.md", "- 규칙이다. 예: `a/b/`.\n")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("d.md:1 인라인 `예:`", errors[0])
+
+    def test_example_sub_bullet_passes(self):
+        text = "- 규칙이다.\n  - 예: `a/b/`\n"
+        self.assertEqual(check_docs.prose_line_errors("d.md", text), [])
+
+    def test_example_inside_code_block_and_table_is_ignored(self):
+        text = "```text\n규칙. 예: x\n```\n| 열 | 설명 |\n| --- | --- |\n| a | 값. 예: `x` |\n"
+        self.assertEqual(check_docs.prose_line_errors("d.md", text), [])
+
+    def test_table_cell_with_three_sentences_fails(self):
+        text = "| 용어 | 설명 |\n| --- | --- |\n| a | 정의다. 구별이다. 흐름이다. |\n"
+        errors = check_docs.prose_line_errors("d.md", text)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("d.md:3 표 셀에 문장이 셋 이상", errors[0])
+
+    def test_table_cell_with_two_sentences_and_code_periods_passes(self):
+        text = "| 용어 | 설명 |\n| --- | --- |\n| a | 정의(`x.y.z`)다. 버전 1.0은 구별이다. |\n"
+        self.assertEqual(check_docs.prose_line_errors("d.md", text), [])
+
+
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.repo = Repo()
@@ -73,6 +98,25 @@ class CliTests(unittest.TestCase):
         git("add", "-A", cwd=self.repo.root)
         result = self.repo.run_script("check_docs.py", "--staged")
         self.assertEqual(result.returncode, 1)
+
+    def test_prose_exempt_glob_skips_file(self):
+        cfg = json.loads((self.repo.root / "scripts/doc-paths.json").read_text())
+        cfg["proseExempt"] = ["docs/adr/*.md"]
+        self.repo.write("scripts/doc-paths.json", json.dumps(cfg))
+        self.repo.write("docs/adr/0001-x.md", "- 결정이다. 예: `x`.\n")
+        self.repo.write("docs/guide.md", "- 규칙이다. 예: `x`.\n")
+        self.repo.commit("prose")
+        result = self.repo.run_script("check_docs.py")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("docs/guide.md:1", result.stderr)
+        self.assertNotIn("docs/adr/0001-x.md", result.stderr)
+
+    def test_staged_prose_violation_fails(self):
+        self.repo.write("docs/guide.md", "| a | b |\n| --- | --- |\n| x | 하나. 둘. 셋. |\n")
+        git("add", "docs/guide.md", cwd=self.repo.root)
+        result = self.repo.run_script("check_docs.py", "--staged")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("docs/guide.md:3 표 셀", result.stderr)
 
     def test_missing_config_exit_2(self):
         (self.repo.root / "scripts/doc-paths.json").unlink()

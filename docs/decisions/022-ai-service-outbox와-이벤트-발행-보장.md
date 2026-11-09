@@ -24,7 +24,7 @@ ai-service는 뉴스 요약을 만들고, 반복해서 실패하는 키워드를
 | 이벤트 | 시점 | eventKey | partitionKey |
 | --- | --- | --- | --- |
 | `SUMMARY_CREATED` | `news_summaries` insert 성공 | `newsSummaryId` | keyword |
-| `KEYWORD_QUARANTINED` | `TRACKING → QUARANTINED` 전이 | `quarantineId:quarantinedAtEpochMillis` | keyword |
+| `KEYWORD_QUARANTINED` | `TRACKING -> QUARANTINED` 전이 | `quarantineId:quarantinedAtEpochMillis` | keyword |
 
 재사용된 요약과 이미 격리된 키워드의 추가 실패는 이벤트를 만들지 않는다. outbox 1행은 도메인 이벤트 1건이다.
 알림 채널 fan-out은 이 서비스의 관심사가 아니다(ADR 023).
@@ -90,7 +90,7 @@ MongoDB는 시각을 밀리초로 잘라 저장하고 CAS는 동등 비교이므
 | 질문 | 답 |
 | --- | --- |
 | retryable | broker 일시 장애, timeout, network (ADR 023의 매핑표). 분류되지 않은 예외도 retryable |
-| 즉시 give up | payload 직렬화·크기·토픽 계약 오류 → `AiOutboxPublishException(retryable=false)` → DEAD |
+| 즉시 give up | payload 직렬화·크기·토픽 계약 오류 -> `AiOutboxPublishException(retryable=false)` -> DEAD |
 | 최대 자동 재시도 | 5회 (실패 5회 누적 시 DEAD) |
 | backoff | 1s x 2^(n-1), 상한 1m, jitter ±20% |
 | Retry-After | 해당 없음 (broker) |

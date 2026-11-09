@@ -16,7 +16,7 @@
 
 - [ ] `.env.example`의 키 목록대로 실제 값을 넣는다. 키 목록은 `.env.example`이 기준이고, 읽는 순서는 루트 README 6장에 있다.
 
-값은 모두 외부 서비스 계정에서 발급받는다. OAuth 클라이언트(Google, Kakao), 뉴스 provider(Naver, Finnhub), LLM provider(OpenRouter, Groq, Together, Cerebras, Mistral, Gemini), 알림 채널(Slack·Discord 웹훅, Telegram 봇 토큰과 chat id), JWT secret과 바인딩 키가 해당한다. 에이전트는 `.env.example`과 `scripts/`만 작성하고 실제 값은 넣지 않는다(`AGENTS.md` 작업 방식). 전역 훅이 `.env*` 편집을 막는다.
+값은 모두 외부 서비스 계정에서 발급받는다. OAuth 클라이언트(Google, Kakao), 뉴스 provider(Naver, Finnhub), LLM provider(OpenRouter, Groq, Together, Cerebras, Mistral), 알림 채널(Slack·Discord 웹훅, Telegram 봇 토큰과 chat id), JWT secret과 바인딩 키가 해당한다. 에이전트는 `.env.example`과 `scripts/`만 작성하고 실제 값은 넣지 않는다(`AGENTS.md` 작업 방식). 전역 훅이 `.env*` 편집을 막는다.
 
 `local` 프로파일은 값이 없어도 기동한다. 다른 프로파일은 값이 없으면 기동에 실패한다(README 6장).
 
@@ -40,7 +40,7 @@ story-service의 `realTest`와 전체 사이클 스모크가 이 컨테이너를
 
 - [ ] `./gradlew :ai-service:realTest`를 과금 계정으로 실행할지 정하고, 실행한다면 해당 provider의 API 키를 `.env`에 넣는다.
 
-`realTest`는 `check`에 포함되지 않는 JVM Test Suite이고, 과금 계정은 클래스 단위로 opt-in한다(ADR 030, `docs/테스트전략.md`). 과금 여부는 사람이 결정한다.
+`realTest`는 `check`에 포함되지 않는 JVM Test Suite이고, 과금 계정은 클래스 단위로 opt-in한다(`docs/테스트전략.md`). 과금 여부는 사람이 결정한다.
 
 ## 5. 전체 사이클 스모크의 수신 확인
 

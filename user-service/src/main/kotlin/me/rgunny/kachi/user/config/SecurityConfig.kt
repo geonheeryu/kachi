@@ -4,7 +4,7 @@ import me.rgunny.kachi.user.adapter.inbound.web.ApiPaths
 import me.rgunny.kachi.user.adapter.inbound.web.oauth.CustomOAuth2UserService
 import me.rgunny.kachi.user.adapter.inbound.web.oauth.OAuth2AuthenticationSuccessHandler
 import me.rgunny.kachi.user.adapter.inbound.web.security.JwtAuthenticationFilter
-import me.rgunny.kachi.user.adapter.inbound.web.security.JwtTokenProvider
+import me.rgunny.kachi.user.application.port.inbound.auth.AuthenticateAccessTokenUseCase
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpStatus
@@ -23,7 +23,7 @@ class SecurityConfig {
     @Bean
     fun securityFilterChain(
         http: HttpSecurity,
-        jwtTokenProvider: JwtTokenProvider,
+        authenticateAccessTokenUseCase: AuthenticateAccessTokenUseCase,
         customOAuth2UserService: CustomOAuth2UserService,
         oAuth2AuthenticationSuccessHandler: OAuth2AuthenticationSuccessHandler,
         oAuth2AuthorizationRequestRepository: AuthorizationRequestRepository<OAuth2AuthorizationRequest>
@@ -69,7 +69,7 @@ class SecurityConfig {
             }
             .addFilterBefore(
                 // Bearer token을 SecurityContext 인증 정보로 변환한다.
-                JwtAuthenticationFilter(jwtTokenProvider),
+                JwtAuthenticationFilter(authenticateAccessTokenUseCase),
                 UsernamePasswordAuthenticationFilter::class.java
             )
 

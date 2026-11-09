@@ -2,14 +2,15 @@
 
 LLM 기반 키워드 확장과 뉴스 요약을 담당하는 서비스다.
 
-초기 구현 범위는 다음 두 흐름이다.
+구현된 흐름은 셋이다.
 
 - 활성 키워드 또는 요청 키워드 기준 관련 검색어를 생성하는 키워드 확장
 - `collector-service`가 저장한 뉴스를 읽어 키워드별 뉴스 묶음을 요약하는 뉴스 요약
+- `story-service`가 발행한 story 이벤트를 받아 story 단위로 버전을 쌓는 story 요약([story 요약](#story-요약))
 
 ## 설계 기준
 
-`ai-service`는 기존 서비스와 동일하게 Hexagonal Architecture를 따른다.
+`ai-service`는 Hexagonal Architecture를 따른다.
 
 ```text
 Scheduler 또는 Internal API
@@ -25,10 +26,12 @@ Scheduler 또는 Internal API
               -> MongoDB
 ```
 
-초기에는 `collector-service`와 같은 WebFlux + reactive MongoDB 구성을 사용한다.
+story 이벤트를 소비해 요약하는 경로는 [story 요약](#story-요약) 절에 있다.
+
+WebFlux와 reactive MongoDB를 쓴다.
 LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요하므로 MVC보다 WebFlux 구성이 더 적합하다.
 
-## 현재 구현 예정 범위
+## 구현 범위
 
 - `KeywordExpansion`, `NewsSummary`, `AiRun` 도메인 모델
 - 키워드 확장 internal API
@@ -39,56 +42,101 @@ LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요�
 - LLM provider adapter
 - user-service 활성 키워드 조회 client
 - collector-service 뉴스 조회 client
+- story 이벤트 소비와 story 요약, story 격리
+- 키워드 격리와 요약 watermark
+- outbox 기반 이벤트 발행
 
 ## Scheduler
 
-스케줄러 실행 진입점은 두 가지다.
+스케줄러 실행 진입점은 세 가지다.
 
 | 대상 | 설정 prefix | 기본 주기 | 기본 활성화 |
 | --- | --- | --- | --- |
 | 뉴스 요약 | `kachi.ai.scheduler.news-summary` | 10m | `true` |
 | 키워드 확장 | `kachi.ai.scheduler.keyword-expansion` | 24h | `false` |
+| story 요약 | `kachi.ai.scheduler.story-summary` | 5m | `true` |
 
-뉴스 요약 scheduler는 매 실행마다 `now - lookback ~ now` 기간의 뉴스를 요약 대상으로 삼는다.
-`lookback`은 실행 주기보다 길게 두어 tick 사이에 수집된 뉴스가 누락되지 않게 하고,
-겹침으로 생기는 중복 요약은 `newsHash` 재사용이 막는다.
+뉴스 요약 scheduler의 요약 구간은 저장된 watermark에서 `overlap`(기본 5m)만큼 물러난 시각부터 now까지다. 구간의 시작은 `now - max-lookback`(기본 6h)보다 앞서지 않는다.
+watermark가 없는 첫 실행은 `now - overlap`에서 시작한다. 겹침으로 생기는 중복 요약은 `newsHash` 재사용이 막는다.
 
-local 프로필은 둘 다 켠다. 뉴스 요약은 기본값 그대로이고 키워드 확장은 local에서만 켠다.
-test 프로필은 둘 다 끈다.
+story 요약 scheduler는 대기 상한(`max-wait`)을 넘긴 story만 한 tick에 `max-stories-per-tick`(기본 20)개까지 요약한다.
+
+local 프로필은 셋 다 켠다. 뉴스 요약과 story 요약은 기본값 그대로이고 키워드 확장은 local에서만 켠다.
+test 프로필은 셋 다 끈다.
 
 실행 중인 같은 AI 작업이 있으면 이번 tick은 건너뛰고 로그만 남긴다.
 
+## story 요약
+
+story-service가 발행한 이벤트를 소비해 story와 기사의 사본을 만들고, 사본만 읽어 요약 버전을 쌓는다.
+
+```text
+story.article.attached -> StoryArticleAttachedKafkaListener
+  -> RecordStoryArticleUseCase: 기사 사본 기록, 미요약 수 증가
+      -> SummarizeStoryUseCase: 미요약 수가 min-new-articles 이상이면 그 자리에서 요약
+story.merged -> StoryMergedKafkaListener
+  -> ApplyStoryMergeUseCase: 흡수된 story의 미요약 기사와 키워드를 흡수한 story로 이동
+      -> SummarizeStoryUseCase: 옮긴 뒤 미요약 수가 min-new-articles 이상이면 그 자리에서 요약
+AiStorySummaryScheduler
+  -> SummarizeDueStoriesUseCase: max-wait를 넘긴 story 요약
+```
+
+요약 시점을 정하는 값은 `kachi.ai.story-summary` 아래에 있다.
+
+| 키 | 뜻 | 기본값 |
+| --- | --- | --- |
+| `min-new-articles` | 미요약 기사가 이 수에 닿으면 소비 스레드에서 바로 요약한다 | `3` |
+| `max-wait` | 미요약 기사가 있는 story를 tick이 요약하기까지 기다리는 상한 | `60m` |
+| `max-articles-per-version` | 한 버전에 싣는 새 기사 수 상한. 오래된 순으로 싣는다 | `50` |
+
+소비 설정은 `kachi.ai.consumer` 아래에 있다.
+
+| 키 | 기본값 | local |
+| --- | --- | --- |
+| `group-id` | `ai-service` | 같음 |
+| `auto-offset-reset` | `earliest` | 같음 |
+| `max-poll-records` | `10` | `1` |
+| `max.poll.interval.ms` (`spring.kafka.consumer.properties`) | Kafka 기본값 | `600000` |
+
+읽을 수 없는 메시지는 `ai.story.dlt`로 보낸다.
+그 밖의 실패는 같은 offset을 backoff(1s에서 2배씩 30s까지)로 다시 처리한다.
+
 ## 이벤트 발행
 
-요약 생성과 키워드 격리는 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다(ADR 022, 023).
-outbox 행 하나가 레코드 하나다. topic은 행의 eventType이 고르고, key는 keyword, value는 기록 시점의 계약 JSON이다.
+요약 생성과 격리, 분리 요청은 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다.
+outbox 행 하나가 레코드 하나다. topic은 행의 eventType이 고르고, value는 기록 시점의 계약 JSON이다.
+key는 키워드 경로에서 keyword, story 경로에서 storyId다.
 계약 타입은 `ai-contract` 모듈에 있다.
 
-| eventType | topic | 계약 |
-| --- | --- | --- |
-| `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEvent` |
-| `KEYWORD_QUARANTINED` | `ai.keyword.quarantined` | `AiKeywordQuarantinedEvent` |
+| 경로 | eventType | topic | 계약 |
+| --- | --- | --- | --- |
+| 키워드 | `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEvent`(schemaVersion 1) |
+| 키워드 | `KEYWORD_QUARANTINED` | `ai.keyword.quarantined` | `AiKeywordQuarantinedEvent` |
+| story | `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEventV2`(schemaVersion 2) |
+| story | `STORY_SPLIT_REQUESTED` | `ai.story.split-requested` | `AiStorySplitRequestedEvent` |
+| story | `STORY_QUARANTINED` | `ai.story.quarantined` | `AiStoryQuarantinedEvent` |
 
-스위치는 둘이고 뜻이 다르다.
+스위치는 셋이고 뜻이 다르다.
 
 | 키 | 뜻 | 기본값 |
 | --- | --- | --- |
 | `kachi.ai.outbox.relay.enabled` | outbox를 읽어 발행 포트로 넘기는 relay | `true` |
 | `kachi.ai.events.enabled` | Kafka 발행 어댑터 | `true` |
+| `kachi.ai.story-summary.events-enabled` | story 경로의 세 이벤트를 outbox에 남길지. env는 `KACHI_AI_STORY_EVENTS_ENABLED`다. 기본값을 꺼 둔 이유는 ADR 034에 있다 | `false` |
 
-relay만 켜고 어댑터가 없으면 기동에 실패한다. local은 둘 다 켜고 test 프로파일은 둘 다 `false`다.
-누가 어떤 채널로 받는지는 이 서비스가 모른다. 요약을 알림으로 fan-out하는 일은 notification-service의 routing이 한다(ADR 025).
+relay만 켜고 어댑터가 없으면 기동에 실패한다. local은 앞의 둘을 켜고 test 프로파일은 둘 다 `false`다.
+누가 어떤 채널로 받는지는 이 서비스가 모른다. 요약을 알림으로 fan-out하는 일은 notification-service의 routing이 한다.
 
 ## LLM
 
-LLM 호출의 단위는 모델이다. 어느 회사의 어느 모델을 어느 용도에 쓰는지는 `domain/llm`의 enum이 정하고, 주소·키·시간·후보 순서만 yaml이 정한다(ADR 030).
+LLM 호출의 단위는 모델이다. 어느 회사의 어느 모델을 어느 용도에 쓰는지는 `domain/llm`의 enum이 정하고, 주소·키·시간·후보 순서만 yaml이 정한다.
 
 | enum | 뜻 | 상수 |
 | --- | --- | --- |
 | `LlmApi` | 요청·응답 규격. adapter 하나가 규격 하나를 맡는다 | `OPENAI_CHAT_COMPLETIONS` |
 | `LlmProvider` | 한 계정으로 부르는 회사 | `GROQ`, `MISTRAL`, `OLLAMA`, `OPENROUTER`, `TOGETHER`, `CEREBRAS`, `MOONSHOT` |
 | `LlmModel` | 한 제공자의 모델 하나. wire id와 요청 옵션을 함께 갖는다 | `GROQ_QWEN3_27B`, `MISTRAL_SMALL_2603`, `OLLAMA_QWEN3_27B` |
-| `LlmUse` | 호출 용도. 용도마다 후보 순서가 따로 있다 | `NEWS_SUMMARY`, `KEYWORD_EXPANSION` |
+| `LlmUse` | 호출 용도. 용도마다 후보 순서가 따로 있다 | `NEWS_SUMMARY`, `STORY_SUMMARY`, `KEYWORD_EXPANSION` |
 
 `LlmModel` 상수는 실호출 검증을 통과한 것만 둔다.
 `-latest` 같은 이동 alias는 쓰지 않는다. 어느 날 다른 모델이 응답해도 알 길이 없기 때문이다.
@@ -109,7 +157,7 @@ yaml은 `kachi.ai.llm` 아래에 있다.
 
 | 프로파일 | 후보 | 비고 |
 | --- | --- | --- |
-| 기본(`application.yaml`) | `GROQ_QWEN3_27B` → `MISTRAL_SMALL_2603` | `GROQ_API_KEY`·`MISTRAL_API_KEY`가 있어야 뜬다 |
+| 기본(`application.yaml`) | `GROQ_QWEN3_27B` -> `MISTRAL_SMALL_2603` | `GROQ_API_KEY`·`MISTRAL_API_KEY`가 있어야 뜬다 |
 | `local` | `OLLAMA_QWEN3_27B` | 같은 머신의 Ollama. 키가 없고 `ollama pull qwen3.8:27b`가 먼저다 |
 | `test` | `OLLAMA_QWEN3_27B` | 주소가 테스트 stub이다 |
 
@@ -128,13 +176,12 @@ api-key 검증은 후보에 오른 제공자에만 건다. 정의만 있는 클�
 - 분산 lock
 - provider별 상세 비용 최적화
 
-현재 `user-service`의 활성 키워드 internal API는 keyword 이름만 제공한다.
-따라서 초기 `ai-service`는 사용자별 확장이 아니라 키워드 단위 확장과 키워드 단위 뉴스 요약으로 설계한다.
-사용자별 알림 대상 매핑은 notification/history 단계에서 별도 계약으로 연결한다.
+`user-service`의 활성 키워드 internal API는 사용자 정보를 주지 않는다.
+키워드 확장과 뉴스 요약의 단위는 사용자가 아니라 키워드다.
 
 ## API
 
-현재 HTTP API는 `/api/v1` prefix를 사용한다.
+HTTP API는 `/api/v1` prefix를 사용한다.
 
 ### Internal
 
@@ -235,7 +282,7 @@ POST /api/v1/internal/ai/news-summaries
 ```
 
 요청 body를 생략하거나 `keywords`가 비어 있으면 `user-service`의 활성 키워드를 조회한다.
-`from`과 `to`가 없으면 서비스 기본 lookback 기간을 사용한다.
+`from`과 `to`가 없으면 collector가 가진 전체 기간의 뉴스를 조회한다. 수동 실행은 watermark를 읽지도 전진시키지도 않는다.
 
 ```json
 {
@@ -274,7 +321,60 @@ POST /api/v1/internal/ai/news-summaries
 }
 ```
 
-이미 같은 AI 작업이 실행 중이면 `409 CONFLICT`를 반환한다.
+키워드 확장과 뉴스 요약 수동 실행은 같은 작업이 이미 실행 중이면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`을 반환한다.
+
+story 요약 버전 조회:
+
+```http
+GET /api/v1/internal/ai/story-summaries?storyId={storyId}&limit={limit}
+```
+
+`limit`은 1 이상 100 이하이고 생략하면 20이다.
+응답 항목에는 `version`, `developmentKind`, `newNewsIds`(이 버전에 새로 실린 기사), `sourceNewsCount`(이 버전까지 누적 기사 수)가 들어 있다.
+
+story 요약 tick 수동 실행:
+
+```http
+POST /api/v1/internal/ai/story-summaries/run
+```
+
+scheduler와 같은 설정으로 대기 상한을 넘긴 story를 요약하고 `due`, `created`, `skipped`, `failed`, `aborted`를 돌려준다.
+tick이 이미 돌고 있으면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`이다.
+
+story 격리 조회와 해제:
+
+```http
+GET /api/v1/internal/ai/story-quarantines?status={TRACKING|QUARANTINED|RELEASED}
+POST /api/v1/internal/ai/story-quarantines/{storyId}/release
+```
+
+`status`를 생략하면 전체를 돌려준다.
+
+키워드 격리 조회와 해제:
+
+```http
+GET /api/v1/internal/ai/keyword-quarantines?targetType={targetType}&status={TRACKING|QUARANTINED|RELEASED}
+POST /api/v1/internal/ai/keyword-quarantines/{keyword}/release?targetType={targetType}
+```
+
+조회는 `targetType`과 `status`를 생략하면 전체를 돌려준다. 해제의 `targetType`은 생략하면 `NEWS_SUMMARY`다.
+해제할 기록이 없으면 `404 NOT_FOUND`, 격리 상태가 아니면 `409 CONFLICT`다.
+
+요약 watermark 조회:
+
+```http
+GET /api/v1/internal/ai/summary-watermarks
+```
+
+outbox 조회와 복구:
+
+```http
+GET /api/v1/internal/ai/outboxes?status={status}&limit={limit}
+POST /api/v1/internal/ai/outboxes/{outboxId}/recover
+```
+
+조회 기본값은 `status=DEAD`, `limit=50`이고 `limit`은 1 이상 500 이하다.
+복구는 `DEAD` 행을 `PENDING`으로 되돌리고 발행은 relay가 한다. 행이 없으면 `404 NOT_FOUND`, `DEAD`가 아니면 `409 CONFLICT`다.
 
 ## 저장소
 
@@ -285,6 +385,12 @@ POST /api/v1/internal/ai/news-summaries
 - `keyword_expansions`: 원본 키워드별 확장 키워드 결과
 - `news_summaries`: 키워드별 뉴스 요약 결과
 - `ai_runs`: 키워드 확장 또는 뉴스 요약 실행 기록
+- `ai_summary_watermarks`: 뉴스 요약이 처리를 끝낸 지점
+- `ai_keyword_quarantines`: 키워드별 연속 실패 누적과 격리 상태
+- `stories`, `story_articles`: story-service 이벤트로 만든 story와 기사 사본
+- `story_summaries`: story 요약 버전. `(storyId, version)`이 unique다
+- `ai_story_quarantines`: story별 연속 실패 누적과 격리 상태
+- `ai_outbox`: 발행 대기 이벤트
 
 MongoDB 문서에는 LLM provider, model, prompt version, token usage, 생성 시각을 남긴다.
 프롬프트 전문은 운영상 필요해질 때 별도 보관 정책을 정하고 추가한다.
@@ -317,6 +423,10 @@ GET {KACHI_COLLECTOR_SERVICE_BASE_URL}/api/v1/internal/news?keyword={keyword}&fr
 - `collectedAt`
 - `matchedKeywords`
 
+### story-service
+
+`story.article.attached`·`story.merged`를 Kafka로 소비한다(계약은 `story-contract` 모듈).
+
 ## 실행
 
 local 기본값:
@@ -328,14 +438,18 @@ KACHI_USER_SERVICE_BASE_URL=http://localhost:8080
 KACHI_COLLECTOR_SERVICE_BASE_URL=http://localhost:8082
 kachi.ai.scheduler.news-summary.enabled=true
 kachi.ai.scheduler.keyword-expansion.enabled=true
+kachi.ai.scheduler.story-summary.enabled=true
+kachi.ai.consumer.max-poll-records=1
 kachi.ai.llm.uses.*.candidates=[OLLAMA_QWEN3_27B]
 ```
 
 실행:
 
+저장소 루트에서 실행한다.
+
 ```sh
 set -a
-source ../.env.local
+source .env.local
 set +a
 ./gradlew :ai-service:bootRun
 ```
@@ -373,7 +487,7 @@ DOCKER_HOST=unix://$HOME/.docker/run/docker.sock ./gradlew :ai-service:test
 
 프로파일의 설정을 Spring 컨텍스트 없이 바인딩해 운영과 같은 조립(adapter·가드·WebClient)으로 후보를 만든다.
 `default`는 기본 yaml만 쓰고, 그 밖의 이름은 `application-<profile>.yaml`이 있어야 한다.
-secret은 기동 스크립트와 같은 순서로 찾는다. 환경변수 → `.env.<profile>` → `.env`이며 없으면 skip이 아니라 실패다.
+secret은 기동 스크립트와 같은 순서로 찾는다. 환경변수 -> `.env.<profile>` -> `.env`이며 없으면 skip이 아니라 실패다.
 
 검사하는 것은 둘이다.
 
@@ -400,4 +514,9 @@ IntelliJ에서는 소스셋이 갈려 있어 `src/test` 전체를 어느 러너�
 - [테스트 전략](../docs/테스트전략.md)
 - [010. ai-service 초기 설계](../docs/decisions/010-ai-service-초기-설계.md)
 - [020. ai-service scheduler 실행 모델과 요약 window](../docs/decisions/020-ai-service-scheduler-실행-모델과-요약-window.md)
+- [022. ai-service outbox와 이벤트 발행 보장](../docs/decisions/022-ai-service-outbox와-이벤트-발행-보장.md)
+- [023. ai-service 도메인 이벤트 발행과 ai-contract](../docs/decisions/023-ai-service-도메인-이벤트-발행과-ai-contract.md)
+- [025. 키워드 구독과 알림 라우팅](../docs/decisions/025-키워드-구독과-알림-라우팅.md)
 - [030. ai-service LLM 호출 단위, 실패 분류, 실호출 검증](../docs/decisions/030-ai-service-llm-호출-단위와-실패-분류와-실호출-검증.md)
+- [031. 요약 단위를 키워드에서 story로](../docs/decisions/031-요약-단위를-키워드에서-story로.md)
+- [034. ai-service story 요약](../docs/decisions/034-ai-service-story-요약.md)

@@ -90,7 +90,7 @@ collector·ai의 클라이언트 코드는 바뀌지 않는다(추가 필드는 
 | `GET /internal/subscriptions?keyword=` | `[{userId, channel}]` — enabled 구독 x 채널 중 바인딩 ACTIVE만. 없는 키워드는 `[]` | notification-routing |
 | `GET /internal/users?role=` | `[{userId, channels}]` — 그 역할의 ACTIVE 사용자 중 ACTIVE 바인딩이 있는 사용자와 그 채널. 바인딩 없는 사용자는 뺀다 | notification-routing (키워드 격리 알림) |
 | `GET /internal/users/{userId}/channel-bindings/{channel}` | `{channel, status, address}` — ACTIVE일 때만 복호화 주소, 아니면 `address: null`. 바인딩이 없으면 404 | notification-worker (W1) |
-| `POST /internal/channel-bindings/telegram/link` | `{token, chatId}` → 204. 토큰 무효·만료는 400 `LINK_TOKEN_INVALID` | Telegram 봇 수신기 (후속) |
+| `POST /internal/channel-bindings/telegram/link` | `{token, chatId}` -> 204. 토큰 무효·만료는 400 `LINK_TOKEN_INVALID` | Telegram 봇 수신기 (후속) |
 
 응답은 모두 활성 키워드 API와 같은 `{success, data, error}` 래핑이다.
 
@@ -142,8 +142,8 @@ internal API는 인증을 두지 않고 `/api/v1/internal/**`를 `permitAll`로 
 
 ## 후속
 
-- Telegram 봇 업데이트 수신기 (`/start` → link internal API)
+- Telegram 봇 업데이트 수신기 (`/start` -> link internal API)
 - internal API 공유 토큰 — ingress 도입 시
 - 암호화 키 교체 절차
-- Telegram 403 → 바인딩 `BOUNCED`
+- Telegram 403 -> 바인딩 `BOUNCED`
 - 운영자 alias 표 (ADR 025)

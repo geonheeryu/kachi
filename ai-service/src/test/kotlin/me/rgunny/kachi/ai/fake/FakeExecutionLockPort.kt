@@ -1,8 +1,8 @@
 package me.rgunny.kachi.ai.fake
 
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockTarget
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockTarget
 
 /**
  * 정해 둔 결과만 돌려주는 실행 lock.

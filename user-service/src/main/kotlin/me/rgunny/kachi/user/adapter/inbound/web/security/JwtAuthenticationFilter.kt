@@ -3,6 +3,7 @@ package me.rgunny.kachi.user.adapter.inbound.web.security
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import me.rgunny.kachi.user.application.port.inbound.auth.AuthenticateAccessTokenUseCase
 import me.rgunny.kachi.user.domain.UserRole
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -10,7 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.filter.OncePerRequestFilter
 
 class JwtAuthenticationFilter(
-    private val jwtTokenProvider: JwtTokenProvider
+    private val authenticateAccessTokenUseCase: AuthenticateAccessTokenUseCase
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(
@@ -31,26 +32,18 @@ class JwtAuthenticationFilter(
     }
 
     private fun authenticate(token: String) {
-        // 1. 서명, 만료 시간, 필수 claim이 유효한 token만 인증 대상으로 본다.
-        if (!jwtTokenProvider.isValid(token)) {
-            return
-        }
+        // 1. 유효한 access token만 인증 대상으로 본다.
+        val authenticated = authenticateAccessTokenUseCase.authenticate(token) ?: return
 
-        // 2. API 인증에는 access token만 사용한다. refresh token은 토큰 갱신 용도다.
-        val claims = jwtTokenProvider.parse(token)
-        if (claims.type != JwtTokenType.ACCESS || claims.role == null) {
-            return
-        }
-
-        // 3. Controller와 application layer에서 사용할 인증 사용자 식별자만 principal에 담는다.
+        // 2. Controller와 application layer에서 사용할 인증 사용자 식별자만 principal에 담는다.
         val principal = AuthenticatedUser(
-            userId = claims.userId,
-            role = claims.role
+            userId = authenticated.userId,
+            role = authenticated.role
         )
         val authentication = UsernamePasswordAuthenticationToken(
             principal,
             null,
-            listOf(SimpleGrantedAuthority(claims.role.authority()))
+            listOf(SimpleGrantedAuthority(authenticated.role.authority()))
         )
 
         SecurityContextHolder.getContext().authentication = authentication

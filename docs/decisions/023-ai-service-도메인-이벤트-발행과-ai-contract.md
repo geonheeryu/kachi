@@ -51,8 +51,7 @@ ADR 022의 기준은 하나다. **같은 payload를 다시 보내도 결과가 �
 설정을 고쳐야 풀리지만, 재시도 5회(약 1~2분) 안에 고쳐지면 스스로 회복하고 아니면 DEAD로 가서 운영 복구 대상이 된다. 즉시 DEAD로 보내서 얻는 것이 없다.
 
 분류 결과는 `AiOutboxPublishException(retryable)`에 담아 던진다. 코드는 `OUTBOX_PUBLISH_FAILED`다. 
-ADR 022가 잡아 둔 `OUTBOX_PAYLOAD_INVALID`는 이 어댑터가 payload를 읽지 않으므로 여기서는 쓰지 않는다. 
-payload가 계약에 맞는지는 기록 시점의 직렬화가 보장하고, 읽는 쪽의 검증은 소비자 몫이다.
+이 어댑터는 payload를 읽지 않는다. payload가 계약에 맞는지는 기록 시점의 직렬화가 보장하고, 읽는 쪽의 검증은 소비자 몫이다.
 
 ### producer 설정과 timeout
 
@@ -159,5 +158,5 @@ kachi:
 
 ## 후속
 
-- Kafka Testcontainers로 relay → 발행 → 계약대로 읽히는지 검증하는 통합 테스트 (ADR 029에서 추가했다)
+- Kafka Testcontainers로 relay -> 발행 -> 계약대로 읽히는지 검증하는 통합 테스트 (ADR 029에서 추가했다)
 - 소비자: notification-service routing (ADR 025 R1)

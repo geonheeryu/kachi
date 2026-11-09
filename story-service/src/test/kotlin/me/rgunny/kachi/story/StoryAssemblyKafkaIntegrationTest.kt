@@ -11,10 +11,10 @@ import me.rgunny.kachi.collector.contract.CollectorNewsCollectedEvent
 import me.rgunny.kachi.collector.contract.CollectorNewsSource
 import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryArticleMongoDocument
 import me.rgunny.kachi.story.adapter.outbound.persistence.story.StoryMongoDocument
-import me.rgunny.kachi.story.adapter.outbound.qdrant.index.QdrantCollection
+import me.rgunny.kachi.story.adapter.outbound.candidateindex.QdrantCollection
 import me.rgunny.kachi.story.adapter.outbound.tei.TeiHttpClient
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateQuery
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateQuery
 import me.rgunny.kachi.story.config.StoryConsumerProperties
 import me.rgunny.kachi.story.contract.StoryArticleAttachedEvent
 import me.rgunny.kachi.story.domain.EmbeddingModel

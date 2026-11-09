@@ -48,7 +48,7 @@
 ### 경계 통합 테스트는 각 모듈이 Kafka Testcontainers로 자기 계약을 검증한다
 
 - **ai-service**
-  - `AiSummaryCycleIntegrationTest`가 Mongo replica set과 Kafka 컨테이너 위에서 요약 → outbox → relay → broker까지 돈다.
+  - `AiSummaryCycleIntegrationTest`가 Mongo replica set과 Kafka 컨테이너 위에서 요약 -> outbox -> relay -> broker까지 돈다.
   - broker에서 읽은 레코드는 `ai-contract`의 `AiSummaryCreatedEvent`·`AiKeywordQuarantinedEvent`로 역직렬화한다.
     소비자가 쓰는 타입으로 읽어야 계약 검증이다.
   - 시나리오: 정상 발행, rate limit 조기 중단, 부분 실패 시 watermark 유지, 격리 이벤트 발행, stale PUBLISHING 회수, 같은 뉴스 재실행 시 이벤트 없음.
@@ -136,8 +136,8 @@ ai-service는 옮겼고 worker의 `*RealIntegrationTest`는 같은 규칙으로 
 테스트전략대로 `src/test`는 실제 provider와 vendor를 부르지 않는다. 모델이 실제로 있는지는 `src/realTest`가 본다(ADR 030).
 사람이 끝까지 확인하는 절차로 두 가지를 둔다.
 
-- `scripts/cycle.sh`가 인프라 → Mongo index → user-service → 나머지 순으로 띄운다.
-- `docs/전체-사이클-스모크.md`가 실제 LLM과 3채널 webhook으로 수집 → 요약 → 수신을 확인하는 체크리스트다.
+- `scripts/cycle.sh`가 인프라 -> Mongo index -> user-service -> 나머지 순으로 띄운다.
+- `docs/전체-사이클-스모크.md`가 실제 LLM과 3채널 webhook으로 수집 -> 요약 -> 수신을 확인하는 체크리스트다.
 
 요약 알림을 실주소로 받으려면 실주소 바인딩을 가진 사용자가 키워드를 구독해야 한다.
 그래서 local seed가 관리자 계정에도 seed 키워드를 3채널로 구독시킨다.

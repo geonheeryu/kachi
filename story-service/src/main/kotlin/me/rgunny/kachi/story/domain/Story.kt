@@ -9,9 +9,9 @@ import java.time.Instant
  * [centroid]는 구성 기사 임베딩의 산술 평균, [keywords]는 구성 기사 키워드의 합집합, [lastArticleAt]은 가장 늦은 발행 시각이다.
  *
  * ```
- * OPEN ──attach/absorb──▶ OPEN
- * OPEN ──close──────────▶ CLOSED
- * OPEN ──mergeInto──────▶ CLOSED (mergedInto = 흡수한 story)
+ * OPEN -> OPEN    (attach, absorb)
+ * OPEN -> CLOSED  (close)
+ * OPEN -> CLOSED  (mergeInto, mergedInto = 흡수한 story)
  * ```
  *
  * 불변이며 전이 메서드는 [version]을 하나 올린 새 인스턴스를 반환한다. 저장소는 직전 version을 조건으로 쓴다.

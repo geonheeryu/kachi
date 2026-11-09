@@ -16,8 +16,8 @@ import kotlin.test.assertTrue
 /**
  * 구독 등록부터 발송 완료까지 요약 알림 한 사이클을 실제 서비스 다섯 개 위에서 돈다.
  *
- * 흐름: user-service에 사용자·바인딩·구독 → collector stub의 뉴스 → ai-service 요약 → `ai.summary.created` →
- * routing → `notification.requested` → notification-service outbox → `notification.dispatch` → worker가 user-service에서
+ * 흐름: user-service에 사용자·바인딩·구독 -> collector stub의 뉴스 -> ai-service 요약 -> `ai.summary.created` ->
+ * routing -> `notification.requested` -> notification-service outbox -> `notification.dispatch` -> worker가 user-service에서
  * 주소를 받아 mock sender로 발송. 단언의 앵커는 `requestId = sum:{summaryId}:u:{userId}:c:{channel}`(ADR 025)이다.
  */
 class SummaryNotificationCycleE2ETest : KachiCycleE2ETestBase() {

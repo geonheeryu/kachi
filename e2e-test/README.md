@@ -1,6 +1,6 @@
 # e2e-test
 
-서비스 다섯 개의 bootJar를 컨테이너로 실행해 구독, 수집, 요약, 라우팅, 발송 사이클을 끝까지 확인하는 모듈이다(ADR 029). 다른 모듈은 이 모듈에 의존하지 않고, 이 모듈은 각 서비스의 bootJar만 사용한다.
+서비스 다섯 개의 bootJar를 컨테이너로 실행해 구독, 요약, 라우팅, 발송 사이클을 끝까지 확인하는 모듈이다. collector-service는 띄우지 않고 stub 서버가 뉴스 조회 API에 응답한다. 다른 모듈은 이 모듈에 의존하지 않고, 이 모듈은 각 서비스의 bootJar만 사용한다.
 
 ## 실행
 
@@ -17,3 +17,7 @@
 - `support/KachiCluster`, `KachiInfrastructure`, `KachiServiceContainer`: 인프라 컨테이너(MySQL, Redis, MongoDB, Kafka)와 서비스 컨테이너 실행.
 - `support/TestLlmServer`, `TestStubServer`: 실제 LLM과 외부 provider 대신 응답하는 stub. 실제 호출 검증은 각 서비스의 `realTest`에서 한다.
 - `support/NotificationStore`, `PrometheusMetrics`, `UserServiceClient`, `JwtSupport`, `KafkaSupport`, `JsonHttp`: 단언과 호출 도우미.
+
+## 관련 문서
+
+- [전체 사이클 검증과 e2e-test 모듈](../docs/decisions/029-전체-사이클-검증과-e2e-test-모듈.md)

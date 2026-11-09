@@ -8,10 +8,10 @@ import me.rgunny.kachi.story.application.port.inbound.assembly.AssembleStoryUseC
 import me.rgunny.kachi.story.application.port.inbound.assembly.model.AssembleStoryResult
 import me.rgunny.kachi.story.application.port.inbound.assembly.model.AttachArticleCommand
 import me.rgunny.kachi.story.application.port.outbound.embedding.EmbeddingPort
-import me.rgunny.kachi.story.application.port.outbound.index.CandidateIndexPort
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateHit
-import me.rgunny.kachi.story.application.port.outbound.index.model.CandidateQuery
-import me.rgunny.kachi.story.application.port.outbound.index.model.IndexedArticle
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.CandidateIndexPort
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateHit
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.CandidateQuery
+import me.rgunny.kachi.story.application.port.outbound.candidateindex.model.IndexedArticle
 import me.rgunny.kachi.story.application.port.outbound.judge.StoryLinkJudge
 import me.rgunny.kachi.story.application.port.outbound.judge.model.JudgeCandidate
 import me.rgunny.kachi.story.application.port.outbound.outbox.StoryOutboxEventSerializer
@@ -36,7 +36,7 @@ import org.springframework.stereotype.Service
 /**
  * 기사 한 건을 같은 사건의 story에 붙이거나 새 story를 여는 유스케이스.
  *
- * 한 기사의 처리는 "재전달 확인 → 임베딩 → 후보 검색·판정 → 트랜잭션 쓰기 → 색인 갱신" 순서다.
+ * 한 기사의 처리는 "재전달 확인 -> 임베딩 -> 후보 검색·판정 -> 트랜잭션 쓰기 -> 색인 갱신" 순서다.
  * 쓰기가 story 갱신 경합으로 밀리면 임베딩은 두고 검색·판정부터 다시 하며, 한도를 넘기면 예외로 끝내 소비자의 재전달에 맡긴다.
  * 색인 갱신 전에 멈춘 기사는 재전달에서 저장된 기사를 찾아 색인만 다시 쓴다.
  * 흡수된 story를 가리키는 후보는 살아남은 story로 치환하고, 그 자리에서 낡은 색인 항목을 고친다.

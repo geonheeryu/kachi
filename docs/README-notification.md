@@ -55,7 +55,7 @@ kachi의 notification 컨텍스트를 한곳에서 읽는 문서다. 핵심만 �
 
 ![notification 모듈 의존](images/notification-modules.svg)
 
-의존 방향은 `service → core → contract`, `worker → core → contract`, `routing → contract`다. service와 worker는 adapter와 조립만 갖고, 유스케이스는 저장·발행·선점·발송을 포트로만 본다. 의존 방향과 배치 규칙은 모듈별 ArchUnit 테스트가 검사한다.
+의존 방향은 `service -> core -> contract`, `worker -> core -> contract`, `routing -> contract`다. service와 worker는 adapter와 조립만 갖고, 유스케이스는 저장·발행·선점·발송을 포트로만 본다. 의존 방향과 배치 규칙은 모듈별 ArchUnit 테스트가 검사한다.
 
 상세문서: [ADR 012](decisions/012-notification-service-초기-모듈-설계.md) · [아키텍처](아키텍처.md)
 
@@ -80,7 +80,9 @@ DB 저장과 Kafka 발행은 한 트랜잭션으로 묶이지 않는다. 알림(
 | ③ | vendor 키 | 알림마다 고정된 멱등 키(24시간)를 sender에 전달 | 재시도로 같은 요청이 vendor에 두 번 가는 것 | 키를 받지 않는 webhook 채널 |
 | ④ | 발송 직전 | `notification:sent:{requestId}` SET NX(24시간) | vendor 호출 뒤 저장 전에 죽어, 회수 후 다시 나가는 것 | 호출 직전에 죽은 한 건은 다시 보내지 않는다 |
 
-조정의 기준은 Redis 마커가 아니라 DB claim이다. 마커는 불필요한 DB 접근을 줄이는 1차 필터다. ④는 중복보다 누락을 택한 결정이다. 같은 알림을 두 번 받는 것은 사용자가 바로 알아채지만, 빠진 한 건은 다음 요약에서 이어진다.
+조정의 기준은 Redis 마커가 아니라 DB claim이다. 마커는 불필요한 DB 접근을 줄이는 1차 필터다.
+
+④는 중복보다 누락을 택한 결정이다. 같은 알림을 두 번 받는 것은 사용자가 바로 알아채지만, 빠진 한 건은 다음 요약에서 이어진다.
 
 상세문서: [알림 멱등 가드](알림-멱등-가드.md) · [ADR 028](decisions/028-발송-직전-주소-조회와-스킵.md)
 
@@ -119,7 +121,9 @@ sender는 vendor 응답을 `RetryFailure(source, category)`로 바꿔 돌려준�
 
 ### fan-out과 결정적 requestId
 
-routing은 계약 모듈에만 의존하는 독립 프로세스다. fan-out이 접수 API와 자원을 나눠 쓰지 않게 하려는 분리다. 요청 키는 입력만으로 정해진다: `sum:{summaryId}:u:{recipientId}:c:{CHANNEL}`. routing이 중간에 죽어 같은 이벤트를 처음부터 다시 펼쳐도 같은 `requestId`가 나오므로 접수 쪽 멱등이 거른다. 그래서 routing 안에 진행 커서나 outbox를 두지 않았다.
+routing은 계약 모듈에만 의존하는 독립 프로세스다. fan-out이 접수 API와 자원을 나눠 쓰지 않게 하려는 분리다.
+
+요청 키는 입력만으로 정해진다: 요약 알림은 `sum:{summaryId}:u:{recipientId}:c:{CHANNEL}`, 키워드 격리 알림은 `qrt:{eventKey}:u:{recipientId}:c:{CHANNEL}`. 격리 알림의 수신자는 user-service에서 조회한 관리자다. routing이 중간에 죽어 같은 이벤트를 처음부터 다시 펼쳐도 같은 `requestId`가 나오므로 접수 쪽 멱등이 거른다. 그래서 routing 안에 진행 커서나 outbox를 두지 않았다.
 
 상세문서: [ADR 025](decisions/025-키워드-구독과-알림-라우팅.md) · [ADR 027](decisions/027-알림-라우팅.md)
 
@@ -174,9 +178,9 @@ notification-service만 HTTP API를 갖는다. 경로 앞에 `/api/v1`이 붙는
 
 ## 7. 남은 한계와 운영 확장 설계
 
-지금 구조가 보장하지 않는 것과 개선 방향이다. 전부 구현 전이고, 구현에 들어갈 때 ADR로 확정한다.
+이 구조가 보장하지 않는 것과 개선 방향이다. 전부 미구현이고, 구현할 때 ADR로 확정한다.
 
-| 우선 | 항목 | 지금 상태 | 개선 방향 |
+| 우선 | 항목 | 상태 | 개선 방향 |
 | --- | --- | --- | --- |
 | P1 | 회수 전 재전달 시 `RETRY_WAIT` 잔류 가능성 | worker가 claim 뒤 죽고 회수 전에 같은 메시지가 재전달되면 소비 선점이 남아 중복으로 ack된다 | 재현 테스트를 먼저 쓰고, `RETRY_WAIT`를 다시 투입하는 경로를 둔다 |
 | P1 | timeout 뒤 재시도의 중복 | webhook 채널에서 vendor는 받았는데 응답이 timeout이면 재시도가 다시 나간다 | timeout을 "결과 불명"으로 따로 분류해 sent 가드를 유지한다 |
@@ -222,7 +226,7 @@ kachi:
 | 그 뒤 구간 | 미적용 | - | 적중률이 낮고 키 수만 는다 |
 | 알림 한 건의 상태 전이 이력, DLT 상세 | 미적용 | - | 단건 조회이고, 복구 판단에 최신 값이 필요하다 |
 
-수신 주소 캐시와 같은 방식으로 조회 포트 앞에 Redis decorator를 두고, 무효화는 TTL만 쓴다. 복구 조작은 조건부 update라 낡은 목록을 보고 실행해도 중복되지 않는다.
+조회 포트 앞에 Redis decorator를 두고, 무효화는 TTL만 쓴다. 복구 조작은 조건부 update라 낡은 목록을 보고 실행해도 중복되지 않는다.
 
 상세문서: [ADR 017](decisions/017-mongodb-replica-set-전환과-트랜잭션-전제.md) · [ADR 018](decisions/018-재시도-폭주-방지와-복구-트래픽-제어.md) · [ADR 028](decisions/028-발송-직전-주소-조회와-스킵.md)
 

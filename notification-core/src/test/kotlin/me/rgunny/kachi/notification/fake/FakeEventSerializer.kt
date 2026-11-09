@@ -1,7 +1,7 @@
 package me.rgunny.kachi.notification.fake
 
-import me.rgunny.kachi.notification.application.port.outbound.messaging.model.NotificationDispatchMessage
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationEventSerializer
+import me.rgunny.kachi.notification.application.port.outbound.outbox.model.NotificationDispatchMessage
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationEventSerializer
 
 class FakeEventSerializer : NotificationEventSerializer {
     val messages = mutableListOf<NotificationDispatchMessage>()

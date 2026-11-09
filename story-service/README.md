@@ -1,9 +1,9 @@
 # story-service
 
-collector가 발행한 기사를 소비해 같은 사건 단위의 story로 조립하고, story 이벤트를 발행하는 서비스다(ADR 031·033).
+collector가 발행한 기사를 소비해 같은 사건 단위의 story로 조립하고, story 이벤트를 발행하는 서비스다.
 기사 사실의 정본은 collector이고, 이 서비스는 기사의 소속(어느 story인가)과 story 상태의 정본이다.
 
-## 현재 구현 상태
+## 구현 상태
 
 - `Story`, `StoryArticle`, `StoryOutbox` 도메인 모델과 판정 기록(`LinkDecision`)
 - `collector.news.collected` 소비와 newsId 멱등 재전달 흡수
@@ -30,7 +30,7 @@ Kafka collector.news.collected
           -> CandidateIndexPort.upsert  -> Qdrant
 
 StoryCloseScheduler · StoryMergeScheduler · IndexCleanupScheduler
-  -> 각 Executor (실행 lock, ADR 036)
+  -> 각 Executor (실행 lock)
       -> 닫기 · 병합 · 색인 정리 유스케이스
 
 StoryOutboxRelayScheduler
@@ -47,7 +47,7 @@ StoryOutboxRelayScheduler
 
 ## API
 
-전부 internal이다. 형식(`ApiPaths`·`ApiResponse`·예외 처리)은 collector와 같다.
+전부 internal이다. 응답은 `ApiResponse`(`success`·`data`·`error`)로 감싼다.
 
 | 메서드·경로 | 동작 |
 | --- | --- |
@@ -55,15 +55,15 @@ StoryOutboxRelayScheduler
 | `GET /api/v1/internal/stories/{storyId}` | story와 구성 기사·판정 기록 |
 | `POST /api/v1/internal/stories/{storyId}/merge/{mergedStoryId}` | 운영자 병합. 앞이 뒤를 흡수한다 |
 | `POST /api/v1/internal/stories/{storyId}/split` | body `newsIds[]`를 새 story로 분리. 전체 분리는 거부 |
-| `POST /api/v1/internal/story-index/rebuild` | Mongo 임베딩으로 색인 재구축. started 또는 already-running |
+| `POST /api/v1/internal/story-index/rebuild` | Mongo 임베딩으로 색인 재구축. started 또는 already-running. 실행 lock을 확인할 수 없으면 503 |
 | `GET /api/v1/internal/story-outboxes?status=&limit=` | outbox 조회. status 기본 DEAD |
 | `POST /api/v1/internal/story-outboxes/{outboxId}/recover` | DEAD 행을 PENDING으로. 발행은 relay가 한다 |
 
-병합·분리는 OPEN story만 받는다. 닫힌 story의 벡터는 색인에 없다는 불변식 때문이다(ADR 033).
+병합·분리는 OPEN story만 받는다. 닫힌 story의 벡터는 색인에 없다는 불변식 때문이다.
 
 ## 이벤트 발행
 
-조립·병합이 outbox 행을 같은 트랜잭션으로 기록하고, relay가 그 행을 Kafka로 내보낸다(ADR 015·022·033).
+조립·병합이 outbox 행을 같은 트랜잭션으로 기록하고, relay가 그 행을 Kafka로 내보낸다.
 key는 storyId, value는 기록 시점의 계약 JSON이다. 계약 타입은 `story-contract` 모듈에 있다.
 
 | eventType | topic | 계약 |
@@ -87,7 +87,7 @@ relay만 켜고 어댑터가 없으면 기동에 실패한다. test 프로파일
 
 ## Scheduler
 
-주기 작업 셋과 relay가 각자 설정을 갖는다. scheduler 빈은 `enabled`로 막는다.
+주기 작업 셋과 relay가 각자 설정을 갖는다. 주기 작업 셋의 scheduler 빈은 항상 생기고 tick마다 `enabled`를 보고 꺼져 있으면 건너뛴다. relay scheduler는 `enabled`가 꺼져 있으면 빈을 만들지 않는다.
 
 ```yaml
 kachi:
@@ -111,18 +111,18 @@ kachi:
 - 닫기: `lastArticleAt`이 `close-after` 지난 OPEN story를 닫고 색인에서 그 story의 벡터를 지운다.
 - 병합: `openedAt`이 `scan-window` 안인 OPEN story끼리 centroid 유사도 ≥ θ_high면 합친다. 생존자는 먼저 연 쪽이다.
 - 정리: 후보 창(`assembly.candidate-window`)을 지난 기사 벡터를 지운다. 보관 창 키는 조립의 것을 같이 읽는다.
-- relay: PENDING claim → 발행 → finalize CAS. visibility timeout이 지난 PUBLISHING 행을 회수한다.
+- relay: PENDING claim -> 발행 -> finalize CAS. visibility timeout이 지난 PUBLISHING 행을 회수한다.
 
-lock 범위는 주기 작업이 `CLUSTER`, relay가 `INSTANCE`다(ADR 036). 현재 구현은 in-memory라 단일 인스턴스 전제다.
+lock 범위는 주기 작업이 `CLUSTER`, relay가 `INSTANCE`다. 구현은 in-memory라 단일 인스턴스 전제다.
 
 ## 저장소
 
-자기 Mongo 데이터베이스 `kachi_story`다. 트랜잭션을 쓰므로 replica set 전제다(ADR 017).
+자기 Mongo 데이터베이스 `kachi_story`다. 트랜잭션을 쓰므로 replica set 전제다.
 
 | 컬렉션 | 인덱스 | 비고 |
 | --- | --- | --- |
 | `stories` | `{status, lastArticleAt}`, `{mergedInto}` | centroid는 double 배열 |
-| `story_articles` | `{newsId}` unique, `{storyId, attachedAt desc}`, `{collectedAt}` | 임베딩은 float32 Binary |
+| `story_articles` | `{storyId, attachedAt desc}`, `{collectedAt}` | `_id`가 newsId다. 임베딩은 float32 Binary |
 | `story_outboxes` | collector와 같음 | |
 
 Qdrant 컬렉션(`story-articles-bge-m3`)은 파생 캐시다. 점 id는 newsId, payload는 storyId·collectedAt·language이고
@@ -144,10 +144,24 @@ user-service·다른 서비스의 API는 부르지 않는다.
 ./scripts/app.sh story-service start
 ```
 
+실제 추론 서버를 부르는 테스트는 `src/realTest`에 있고 `test`·`check`에 끼지 않는다.
+
+```sh
+./scripts/infra.sh tei start && ./gradlew :story-service:realTest
+```
+
 TEI·Qdrant 주소는 `.env`의 `KACHI_STORY_TEI_EMBEDDING_BASE_URL`·`KACHI_STORY_TEI_RERANKER_BASE_URL`·`KACHI_STORY_QDRANT_HOST`·`KACHI_STORY_QDRANT_GRPC_PORT`로 바꾼다.
 포트 배치는 `docs/포트-구성.md`, 통합 테스트 실행 조건은 `docs/테스트전략.md`를 따른다.
 
 ## 다음 작업
 
-- ai-service가 `story.article.attached`를 소비해 story 단위로 요약한다(ADR 034 예정). 그때까지 발행된 이벤트는 소비자 없이 보존 기간 안에 쌓인다.
-- 분리(`NEW_STORY`) 이벤트 발행과 Schema Registry 도입은 열린 결정이다(ADR 033).
+- 분리(`NEW_STORY`) 이벤트 발행과 Schema Registry 도입은 ADR 033의 열린 결정이다.
+
+## 관련 문서
+
+- [015. notification outbox publish runtime](../docs/decisions/015-notification-outbox-publish-runtime.md)
+- [017. MongoDB replica set 전환과 트랜잭션 전제](../docs/decisions/017-mongodb-replica-set-전환과-트랜잭션-전제.md)
+- [022. ai-service outbox와 이벤트 발행 보장](../docs/decisions/022-ai-service-outbox와-이벤트-발행-보장.md)
+- [031. 요약 단위를 키워드에서 story로](../docs/decisions/031-요약-단위를-키워드에서-story로.md)
+- [033. story-service 조립](../docs/decisions/033-story-service-조립.md)
+- [036. 실행 lock 포트 분리와 lock 범위](../docs/decisions/036-실행-lock-포트-분리와-lock-범위.md)

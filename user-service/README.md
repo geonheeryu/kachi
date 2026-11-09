@@ -5,7 +5,7 @@
 `collector-service`·`ai-service`는 수집 대상 키워드를 직접 소유하지 않고 이 서비스의 internal API에서 활성 키워드를 조회한다.
 notification-routing과 notification-worker는 같은 internal API로 키워드·역할의 수신자와 수신 주소를 조회한다.
 
-## 현재 구현 상태
+## 구현 상태
 
 - `User`, `Keyword`(canonical), `Subscription`, `ChannelBinding` 도메인 모델
 - OAuth2 provider 기반 사용자 식별
@@ -22,7 +22,7 @@ notification-routing과 notification-worker는 같은 internal API로 키워드�
 
 ## API
 
-현재 HTTP API는 `/api/v1` prefix를 사용한다.
+HTTP API는 `/api/v1` prefix를 사용한다.
 
 ### Auth
 
@@ -149,7 +149,7 @@ Authorization: Bearer {accessToken}
 ```
 
 ```json
-[{ "channel": "SLACK", "status": "ACTIVE", "addressMasked": "https://hooks.slack.com/****", "boundAt": "…", "revokedAt": null }]
+{ "success": true, "data": [{ "channel": "SLACK", "status": "ACTIVE", "addressMasked": "https://hooks.slack.com/****", "boundAt": "…", "revokedAt": null }], "error": null }
 ```
 
 Slack·Discord 연결 — 자기 incoming webhook URL을 등록한다. 즉시 `ACTIVE`가 된다:
@@ -163,7 +163,7 @@ Authorization: Bearer {accessToken}
 { "webhookUrl": "https://hooks.slack.com/services/…" }
 ```
 
-Slack은 `https://hooks.slack.com/`, Discord는 `https://discord.com/api/webhooks/`로 시작해야 한다. 아니면 `400 INVALID_CHANNEL_ADDRESS`다.
+Slack은 `https://hooks.slack.com/`, Discord는 `https://discord.com/api/webhooks/`나 `https://discordapp.com/api/webhooks/`로 시작해야 한다. 아니면 `400 INVALID_CHANNEL_ADDRESS`다.
 
 Telegram 연결 — 본문 없이 호출하면 연결 링크를 돌려주고 바인딩은 `PENDING`이 된다:
 
@@ -173,10 +173,10 @@ Authorization: Bearer {accessToken}
 ```
 
 ```json
-{ "linkUrl": "https://t.me/kachi_local_bot?start=…", "expiresAt": "…" }
+{ "success": true, "data": { "linkUrl": "https://t.me/kachi_local_bot?start=…", "expiresAt": "…" }, "error": null }
 ```
 
-사용자가 링크를 열어 봇에 `/start <token>`을 보내면 봇 수신기가 아래 internal API로 chat id를 넘겨 `ACTIVE`가 된다. 링크는 10분 뒤 만료되며 다시 PUT하면 새 링크가 나온다.
+사용자가 링크를 열어 봇에 `/start <token>`을 보내면 봇 수신기가 아래 internal API로 chat id를 넘겨 `ACTIVE`가 된다. 봇 수신기는 (계획, 미구현)이고 internal API만 있다. 링크는 10분 뒤 만료되며 다시 PUT하면 새 링크가 나온다.
 
 해지:
 
@@ -190,7 +190,7 @@ Authorization: Bearer {accessToken}
 ### Internal
 
 internal API는 `/api/v1/internal/**`이며 인증 없이 열려 있다. 같은 호스트의 서비스끼리만 호출한다는 전제이고,
-외부 ingress를 붙이는 시점이 공유 토큰 인증을 넣는 조건이다(ADR 026).
+외부 ingress를 붙이는 시점이 공유 토큰 인증을 넣는 조건이다.
 응답은 모두 `{ "success", "data", "error" }`로 감싼다.
 
 활성 키워드 조회 — collector-service·ai-service가 호출한다:
@@ -330,6 +330,9 @@ Schema 변경은 Flyway migration으로 관리하고, JPA `ddl-auto`는 `validat
 | `kachi.user.binding.encryption-key` | `KACHI_USER_BINDING_KEY` | 바인딩 주소 암호화 키. base64로 표기한 32바이트 |
 | `kachi.user.binding.link-token-ttl` | - | Telegram 연결 링크 만료. 기본 `10m` |
 | `kachi.user.telegram.bot-username` | `KACHI_USER_TELEGRAM_BOT_USERNAME` | 연결 링크 `https://t.me/{bot}?start=`의 봇 계정명 |
+| `kachi.jwt.secret` | `KACHI_JWT_SECRET` | access token 서명 키 |
+| `kachi.oauth2.success-redirect-uri` | `KACHI_OAUTH2_SUCCESS_REDIRECT_URI` | OAuth2 로그인 성공 뒤 token을 넘길 frontend 주소 |
+| `kachi.user.seed.admin-addresses.{slack,discord,telegram}` | `KACHI_USER_SEED_ADMIN_SLACK_WEBHOOK_URL`, `KACHI_USER_SEED_ADMIN_DISCORD_WEBHOOK_URL`, `KACHI_USER_SEED_ADMIN_TELEGRAM_CHAT_ID` | local 프로필에서 관리자 사용자에게 심는 채널 주소. 비우면 심지 않는다 |
 
 로컬 값은 `.env.example`에 있다. 암호화 키는 운영 비밀이며 바꾸면 기존 암호문을 복호화할 수 없다.
 

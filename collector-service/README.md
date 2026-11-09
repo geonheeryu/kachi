@@ -2,9 +2,9 @@
 
 뉴스와 시장 데이터를 외부 provider에서 수집하고, 수집 실행 기록과 신규 뉴스를 MongoDB에 저장하는 서비스다.
 
-현재 구현 범위는 뉴스 수집이다. 시장 데이터 수집은 아직 구현하지 않았다.
+구현 범위는 뉴스 수집이다. 시장 데이터 수집은 미구현이다.
 
-## 현재 구현 상태
+## 구현 상태
 
 - `News`, `CollectionRun`, `ProviderCollectionResult` 도메인 모델
 - 정규화 URL hash 기반 중복 방어
@@ -59,7 +59,7 @@ CollectorOutboxRelayScheduler
 GET /api/v1/internal/providers/news/{source}/health?keyword=NVIDIA
 ```
 
-현재 지원 source:
+지원 source:
 
 - `GOOGLE`
 - `NAVER` (Naver API key 필요)
@@ -96,7 +96,7 @@ POST /api/v1/internal/collections/news
 ```
 
 요청 body는 생략할 수 있다. 생략하면 활성 키워드를 자동 조회한다.
-현재 외부 provider 연결 확인 단계에서는 user-service 연동 없이 키워드를 직접 넘겨 collector 단독으로 smoke test를 진행한다.
+키워드를 직접 넘기면 user-service를 조회하지 않고 그 키워드로 수집한다.
 
 ```json
 {
@@ -126,7 +126,7 @@ POST /api/v1/internal/collections/news
 }
 ```
 
-이미 수집이 실행 중이면 `409 CONFLICT`를 반환한다.
+이미 수집이 실행 중이면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`을 반환한다.
 
 저장 뉴스 조회:
 
@@ -135,8 +135,8 @@ GET /api/v1/internal/news?keyword=NVIDIA&from=2026-06-01T00:00:00Z&to=2026-06-02
 ```
 
 이 API는 `ai-service`가 요약 대상 뉴스를 읽기 위한 내부 계약이다.
-`keyword`는 필수이고, `from`, `to`, `limit`은 선택값이다.
-`excerpt`는 provider가 준 발췌문이고 `language`는 provider 설정이 정한 언어다.
+`keyword`는 필수이고, `from`, `to`, `limit`은 선택값이다. `limit`은 1 이상 100 이하이고 생략하면 20이다.
+`excerpt`는 provider가 준 발췌문이고 `language`는 기사 언어다. Google은 설정 `language-code`의 값이고 Naver는 `ko`, Finnhub은 `en`으로 고정이다.
 모든 필드가 항상 있다. 제목·발췌문·URL·발행 시각 중 하나라도 없는 provider item은 수집 시점에 제외된다.
 
 ```json
@@ -166,12 +166,12 @@ GET /api/v1/internal/collector/outboxes?status=DEAD&limit=50
 POST /api/v1/internal/collector/outboxes/{outboxId}/recover
 ```
 
-조회 기본값은 `status=DEAD`, `limit=50`이고 payload는 응답에 넣지 않는다.
+조회 기본값은 `status=DEAD`, `limit=50`이고 `limit`은 1 이상 500 이하다. payload는 응답에 넣지 않는다.
 복구는 DEAD 행을 PENDING으로 되돌리기만 하고 발행은 다음 relay tick이 한다. 없는 행은 `404`, DEAD가 아닌 행은 `409`다.
 
 ## 이벤트 발행
 
-기사 한 건이 저장되면 같은 트랜잭션으로 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다(ADR 022, 032).
+기사 한 건이 저장되면 같은 트랜잭션으로 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다.
 outbox 행 하나가 레코드 하나다. key는 기사 id, value는 기록 시점의 계약 JSON이다.
 계약 타입은 `collector-contract` 모듈에 있다.
 
@@ -210,10 +210,10 @@ kachi:
 
 ## 단일 인스턴스 실행 가정
 
-중복 실행 방지는 `ExecutionLockPort` 뒤에 있다(ADR 036).
+중복 실행 방지는 `ExecutionLockPort` 뒤에 있다.
 `CollectorExecutionLock`이 뉴스 수집을 `CLUSTER`, outbox relay를 `INSTANCE` 범위로 선언하고, executor는 이 포트로 실행 겹침 방지를 요청할 뿐 lock 구현을 모른다.
 
-현재 두 범위 모두 `InMemoryExecutionLockAdapter`로 이어져 있어 단일 collector 인스턴스 안에서만 유효하다.
+두 범위 모두 `InMemoryExecutionLockAdapter`로 이어져 있어 단일 collector 인스턴스 안에서만 유효하다.
 인스턴스를 늘리면 `CLUSTER` 범위 작업이 인스턴스마다 따로 돌므로, 그 전에 `ExecutionLockConfig`의 범위-구현 연결을 distributed lock adapter로 바꾼다. executor와 진입점은 바뀌지 않는다.
 
 ## 외부 연동
@@ -244,8 +244,7 @@ kachi:
 
 ### Google News RSS
 
-초기 뉴스 provider는 Google News RSS다.
-API key 없이 수집 흐름을 검증할 수 있지만, 공식 안정 JSON API가 아니므로 응답 구조나 접근 제한이 바뀔 수 있다.
+Google News RSS는 API key 없이 수집할 수 있다. 공식 안정 JSON API가 아니므로 응답 구조나 접근 제한이 바뀔 수 있다.
 
 상세 설정 근거는 [collector-service WebClient 설정](../docs/collector-webclient-설정.md)을 따른다.
 
@@ -264,7 +263,7 @@ kachi:
         display: 100
         sort: date
 ```
-기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_NAVER_ENABLED=false`로 끈다.
+기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_PROVIDERS_NAVER_ENABLED=false`로 끈다.
 
 ### Finnhub Company News
 
@@ -281,7 +280,7 @@ kachi:
         lookback-days: 7
 ```
 
-기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_FINNHUB_ENABLED=false`로 끈다.
+기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_PROVIDERS_FINNHUB_ENABLED=false`로 끈다.
 
 ## 저장소
 
@@ -293,7 +292,7 @@ kachi:
 - `collection_runs`: 수집 실행 기록
 - `collector_outbox`: 발행 대기 이벤트. `eventKey`(기사 id)가 unique다
 
-MongoDB는 replica set이어야 한다(ADR 017). 기사와 outbox를 한 트랜잭션으로 쓴다.
+MongoDB는 replica set이어야 한다. 기사와 outbox를 한 트랜잭션으로 쓴다.
 
 로컬 MongoDB는 `infra/docker-compose.mongo.yml`로 실행한다.
 
@@ -307,18 +306,19 @@ docker compose -f infra/docker-compose.yml -f infra/docker-compose.mongo.yml up 
 
 ```text
 server.port=8082
-MONGO_HOST=localhost
-MONGO_PORT=27017
-MONGO_DATABASE=kachi_collector
+spring.mongodb.uri=mongodb://localhost:27017/kachi_collector?replicaSet=rs0
+spring.kafka.bootstrap-servers=localhost:9092
 KACHI_USER_SERVICE_BASE_URL=http://localhost:8080
-KACHI_COLLECTOR_NEWS_SCHEDULER_ENABLED=false
+kachi.collector.scheduler.news.enabled=true
 ```
 
 실행:
 
+저장소 루트에서 실행한다.
+
 ```sh
 set -a
-source ../.env.local
+source .env.local
 set +a
 ./gradlew :collector-service:bootRun
 ```
@@ -362,3 +362,12 @@ curl -X POST "http://localhost:8082/api/v1/internal/collections/news" \
 - Google RSS 리다이렉트 URL을 원문 URL로 해석
 - Google RSS 제목/언론사명 정규화
 - 분산 실행이 필요해지는 시점에 distributed lock 도입
+
+## 관련 문서
+
+- [collector-service 뉴스 수집 실행 모델](../docs/decisions/008-collector-service-뉴스-수집-실행-모델.md)
+- [외부 뉴스 provider 연동 기준](../docs/decisions/009-외부-뉴스-provider-연동-기준.md)
+- [MongoDB replica set 전환과 트랜잭션 전제](../docs/decisions/017-mongodb-replica-set-전환과-트랜잭션-전제.md)
+- [ai-service outbox와 이벤트 발행 보장](../docs/decisions/022-ai-service-outbox와-이벤트-발행-보장.md)
+- [collector 기사 이벤트 발행과 collector-contract](../docs/decisions/032-collector-기사-이벤트-발행과-collector-contract.md)
+- [실행 lock 포트 분리와 lock 범위](../docs/decisions/036-실행-lock-포트-분리와-lock-범위.md)

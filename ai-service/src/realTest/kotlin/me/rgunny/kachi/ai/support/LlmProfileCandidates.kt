@@ -62,7 +62,7 @@ class LlmProfileCandidates(
     private fun bind(): LlmProperties {
         val secrets = TestSecretEnvironment(profile)
         val sources = MutablePropertySources().apply {
-            // 소스 우선순위(서비스와 동일): 환경변수 > 프로파일 yaml > 기본 yaml > env 파일
+            // 소스 우선순위: 환경변수 > 프로파일 yaml > 기본 yaml > env 파일
             addLast(
                 // relaxed 매핑(KACHI_AI_LLM_...)이 붙는 Spring 표준 소스 이름
                 SystemEnvironmentPropertySource(

@@ -115,7 +115,7 @@ class LlmConfig {
      * 제공자의 API 규격에 맞는 adapter 전략을 고른다.
      *
      * 선택 키는 [LlmApi]이고 분기는 여기 한 곳뿐이다. 규격이 늘면 상수가 하나 늘고 이 `when`이 빠진 분기를 컴파일에서 잡는다.
-     * 규격이 하나뿐인 지금 선택을 별도 객체로 빼면 우회만 는다.
+     * 규격이 하나뿐이라 선택을 별도 객체로 두지 않는다.
      */
     private fun adapter(
         model: LlmModel,

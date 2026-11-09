@@ -16,7 +16,7 @@ CAS의 기대값은 전이 **전**의 `claimedAt`·`claimedBy`인데, 가변 전
 notification-service의 outbox publish 확정은 아직 CAS가 아니라 `mongoTemplate.save` 덮어쓰기라서, ADR 015에 규칙으로만 적어 둔 "늦은 publish 결과는 outbox가 아직 `PUBLISHING`일 때만 반영한다"를 저장소가 강제하지 못한다.  
 여기에 CAS를 넣으면 스냅샷이 세 벌이 된다.
 
-가변 전이에는 또 하나의 약점이 있다. 같은 인스턴스를 전이 → 읽기 → 전달 순으로 쓰는 코드의 순서를 컴파일러가 지켜 주지 않는다.  
+가변 전이에는 또 하나의 약점이 있다. 같은 인스턴스를 전이 -> 읽기 -> 전달 순으로 쓰는 코드의 순서를 컴파일러가 지켜 주지 않는다.  
 `NotificationAdminService`에서 DEAD 복구 전이와 dispatch payload 직렬화의 순서가 바뀌면 DEAD 상태 payload가 Kafka로 나가는데,  
 그 실수를 잡는 것은 테스트뿐이다.
 

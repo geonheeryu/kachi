@@ -1,5 +1,6 @@
 package me.rgunny.kachi.notification.service.architecture
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
@@ -45,9 +46,31 @@ class ArchitectureTest {
 
         @ArchTest
         @JvmField
+        val inbound_adapters_do_not_implement_outbound_ports: ArchRule = noClasses()
+            .that().resideInAPackage("..service.adapter.inbound..")
+            .should().implement(JavaClass.Predicates.resideInAPackage("..notification.application.port.outbound.."))
+            .allowEmptyShould(true)
+
+        @ArchTest
+        @JvmField
         val outbound_adapters_do_not_depend_on_each_other: ArchRule = slices()
             .matching("..service.adapter.outbound.(*)..")
             .should().notDependOnEachOther()
+
+        @ArchTest
+        @JvmField
+        val outbound_adapter_packages_are_named_after_ports: ArchRule = classes()
+            .that().resideInAPackage("..service.adapter.outbound..")
+            .should().resideInAnyPackage(
+                "..service.adapter.outbound.dlt..",
+                "..service.adapter.outbound.idempotency..",
+                "..service.adapter.outbound.notification..",
+                "..service.adapter.outbound.outbox..",
+                "..service.adapter.outbound.recipient..",
+                "..service.adapter.outbound.sender..",
+                "..service.adapter.outbound.persistence..",
+            )
+            .because("adapter/outbound 1단은 그 어댑터가 구현하는 포트 패키지의 이름이다. 포트가 다른 어댑터들이 같은 구현 클래스를 함께 쓸 때만 기술 이름을 쓴다 (docs/패키지구조.md)")
 
         @ArchTest
         @JvmField

@@ -1,5 +1,6 @@
 package me.rgunny.kachi.user.architecture
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
@@ -67,9 +68,30 @@ class ArchitectureTest {
 
         @ArchTest
         @JvmField
+        val inbound_adapters_do_not_implement_outbound_ports: ArchRule = noClasses()
+            .that().resideInAPackage("..adapter.inbound..")
+            .should().implement(JavaClass.Predicates.resideInAPackage("..application.port.outbound.."))
+            .allowEmptyShould(true)
+
+        @ArchTest
+        @JvmField
         val outbound_adapters_do_not_depend_on_each_other: ArchRule = slices()
             .matching("..adapter.outbound.(*)..")
             .should().notDependOnEachOther()
+
+        @ArchTest
+        @JvmField
+        val outbound_adapter_packages_are_named_after_ports: ArchRule = classes()
+            .that().resideInAPackage("..adapter.outbound..")
+            .should().resideInAnyPackage(
+                "..adapter.outbound.auth..",
+                "..adapter.outbound.binding..",
+                "..adapter.outbound.keyword..",
+                "..adapter.outbound.subscription..",
+                "..adapter.outbound.user..",
+                "..adapter.outbound.persistence..",
+            )
+            .because("adapter/outbound 1단은 그 어댑터가 구현하는 포트 패키지의 이름이다. 포트가 다른 어댑터들이 같은 구현 클래스를 함께 쓸 때만 기술 이름을 쓴다 (docs/패키지구조.md)")
 
         @ArchTest
         @JvmField
@@ -89,16 +111,16 @@ class ArchitectureTest {
 
         @ArchTest
         @JvmField
-        val outbound_ports_are_interfaces: ArchRule = classes()
-            .that().resideInAPackage("..application.port.outbound..")
-            .and().areNotEnums()
+        val outbound_port_roots_hold_only_interfaces: ArchRule = classes()
+            .that().resideInAPackage("..application.port.outbound.*")
+            .and().areTopLevelClasses()
             .should().beInterfaces()
 
         @ArchTest
         @JvmField
-        val inbound_use_case_ports_are_interfaces: ArchRule = classes()
-            .that().resideInAPackage("..application.port.inbound..")
-            .and().haveSimpleNameEndingWith("UseCase")
+        val inbound_port_roots_hold_only_interfaces: ArchRule = classes()
+            .that().resideInAPackage("..application.port.inbound.*")
+            .and().areTopLevelClasses()
             .should().beInterfaces()
 
         @ArchTest

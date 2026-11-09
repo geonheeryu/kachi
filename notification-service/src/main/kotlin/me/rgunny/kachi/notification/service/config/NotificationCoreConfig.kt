@@ -8,8 +8,8 @@ import me.rgunny.kachi.notification.application.port.inbound.outbox.Notification
 import me.rgunny.kachi.notification.application.port.inbound.request.RequestNotificationUseCase
 import me.rgunny.kachi.notification.application.port.outbound.dlt.NotificationDltMessageAdminPersistencePort
 import me.rgunny.kachi.notification.application.port.outbound.idempotency.NotificationDeduplicationPort
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationDispatchPublisher
-import me.rgunny.kachi.notification.application.port.outbound.messaging.NotificationEventSerializer
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationDispatchPublisher
+import me.rgunny.kachi.notification.application.port.outbound.outbox.NotificationEventSerializer
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationAdminPersistencePort
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationPersistencePort
 import me.rgunny.kachi.notification.application.port.outbound.notification.NotificationPublishPersistencePort

@@ -2,8 +2,8 @@ package me.rgunny.kachi.collector.adapter.inbound.collection
 
 import me.rgunny.kachi.collector.application.port.inbound.collection.CollectNewsUseCase
 import me.rgunny.kachi.collector.application.port.inbound.collection.model.CollectNewsCommand
-import me.rgunny.kachi.collector.application.port.outbound.lock.CollectorExecutionLock
-import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.CollectorExecutionLock
+import me.rgunny.kachi.collector.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.collector.application.port.outbound.lock.ExecutionLockPort
 import org.springframework.stereotype.Component
 

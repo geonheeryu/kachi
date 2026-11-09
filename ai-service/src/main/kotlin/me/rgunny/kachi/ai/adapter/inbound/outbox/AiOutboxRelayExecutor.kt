@@ -1,8 +1,8 @@
 package me.rgunny.kachi.ai.adapter.inbound.outbox
 
 import me.rgunny.kachi.ai.application.port.inbound.outbox.RelayAiOutboxUseCase
-import me.rgunny.kachi.ai.application.port.outbound.lock.AiExecutionLock
-import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockOutcome
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.AiExecutionLock
+import me.rgunny.kachi.ai.application.port.outbound.lock.model.ExecutionLockOutcome
 import me.rgunny.kachi.ai.application.port.outbound.lock.ExecutionLockPort
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component

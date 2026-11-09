@@ -6,7 +6,7 @@ import java.util.Locale
 /**
  * 키워드 원문을 canonical 문자열로 정규화한다.
  *
- * NFKC → trim → 연속 공백 1개 → casefold(Locale.ROOT) → 양끝 구두점 제거(Unicode P* 카테고리).
+ * NFKC -> trim -> 연속 공백 1개 -> casefold(Locale.ROOT) -> 양끝 구두점 제거(Unicode P* 카테고리).
  * 기호(S*, 예: `$`, `+`)와 문자열 중간의 구두점(예: `space-x`의 하이픈)은 남긴다.
  */
 object KeywordNormalizer {

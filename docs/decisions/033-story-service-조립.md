@@ -50,7 +50,7 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
 
 ### 판정 규칙과 임계값
 
-기사 하나의 조립은 후보 검색 → 점수 → 판정 → 저장 순이다.
+기사 하나의 조립은 후보 검색 -> 점수 -> 판정 -> 저장 순이다.
 
 - 후보는 72시간 창에서 top-10이고, 후보 story의 점수는 `max(centroid 유사도, 그 story의 최근 기사 5건과의 최대 유사도)`다. centroid만 쓰면 큰 story의 평균에 묻혀 최신 전개와의 근접이 사라진다.
 - 점수 ≥ θ_high면 자동 병합, θ_low 미만이면 새 story, 사이면 회색 후보 전부를 판정기에 넣고 최고 점수가 θ_judge 이상일 때만 병합한다. 판정기 입력은 최대 유사도를 낸 그 기사다.
@@ -85,11 +85,11 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
   - 보관 창 키는 조립의 후보 창 설정을 같이 읽는다. 키가 둘이면 정리 창이 후보 창보다 짧아져 후보 검색이 조용히 깨지는 갈라짐이 가능해진다.
 - 색인의 낡은 storyId payload는 읽는 쪽이 고친다. 조립이 후보를 읽었는데 CLOSED이고 `mergedInto`가 있으면 살아남은 story로 치환하고 그 자리에서 색인 payload를 고쳐, 병합 커밋과 색인 이전 사이에 무엇이 끼어도 실패 창이 스스로 닫힌다.
 
-실행 모델은 scheduler → executor(실행 lock) → use case다(ADR 008·020). lock 범위는 주기 작업 넷이 `CLUSTER`, outbox relay가 `INSTANCE`다(ADR 036).
+실행 모델은 scheduler -> executor(실행 lock) -> use case다(ADR 008·020). lock 범위는 주기 작업 넷이 `CLUSTER`, outbox relay가 `INSTANCE`다(ADR 036).
 
 ### 이벤트 발행
 
-- outbox 구조와 상태 전이(PENDING→PUBLISHING→PUBLISHED|DEAD, claim CAS, stale 회수, backoff 재시도)는 ADR 015·022를 collector(ADR 032)와 같은 형태로 갖는다. payload는 기록 시점에 계약 JSON으로 고정된다.
+- outbox 구조와 상태 전이(PENDING -> PUBLISHING -> PUBLISHED|DEAD, claim CAS, stale 회수, backoff 재시도)는 ADR 015·022를 collector(ADR 032)와 같은 형태로 갖는다. payload는 기록 시점에 계약 JSON으로 고정된다.
 - topic은 `story.article.attached`(기사가 붙은 뒤의 story 상태와 기사 내용)와 `story.merged`(생존·흡수 storyId) 둘이고 key는 storyId다. 같은 story의 이벤트가 같은 파티션이라 순서가 지켜지고, 기사 내용을 실어 ai-service가 collector도 story-service도 조회하지 않는다(ADR 031).
 - 두 topic은 compaction 없이 `cleanup.policy=delete`(retention 30일)다.
   - key가 storyId라 한 story의 attach 이벤트 여러 건이 같은 key이고, compaction이 걸리면 이전 attach 이벤트가 지워진다. `collector.news.collected`의 compact+delete는 key(newsId)가 레코드당 유일해서 성립한 것이다.
@@ -112,7 +112,7 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
 - **Qdrant 벡터 양자화**: rebuild로 되돌릴 수 있는 결정이고 로컬에서 효과를 못 잰다. float32 무양자화로 시작하고 운영 메모리 측정 뒤 판단한다.
 - **판정기 상수에 LLM 유지**: 구현 없는 enum 상수는 config에 미지원 분기를 만든다(ADR 030). 지웠고, 필요 시 adapter 하나로 돌아온다.
 - **병합 job의 전수 스캔**: 창 밖에서 뒤늦게 가까워진 쌍도 잡지만 틱 비용이 누적 story 수에 비례한다. 창 밖 쌍은 다음 기사가 들어올 때 조립 후보로 다시 만나므로, 남는 것은 재현율 문제이지 정합성 문제가 아니다.
-- **분리·닫힘 이벤트 발행**: 소비자(ai-service)가 아직 없어 계약을 정할 근거가 없다. `NEW_STORY` 분리 이벤트의 소비 시점은 열린 항목이다.
+- **분리·닫힘 이벤트 발행**: 소비자가 없어 계약을 정할 근거가 없다. `NEW_STORY` 분리 이벤트의 소비 시점은 열린 항목이다.
 
 ## 트레이드오프
 
@@ -130,7 +130,7 @@ search 지연은 차이가 없고 upsert에서 직렬화 크기(protobuf 4KB 대
 
 ## 후속
 
-- ADR 034: ai-service가 `story.article.attached`를 소비해 story를 요약한다.
+- ADR 034: ai-service가 `story.article.attached`·`story.merged`를 소비해 story를 요약한다.
 - `NEW_STORY` 분리 이벤트의 소비 시점, Schema Registry 도입 위치는 열린 항목이다.
 - 메트릭은 collector·ai와 함께 별도 결정으로 다룬다(ADR 019 이후).
 
