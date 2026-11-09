@@ -140,7 +140,8 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 
 전체 사이클을 한 번에 띄워 실제 LLM·채널로 확인할 때는 `cycle.sh`를 쓴다.
 
-- 인프라 -> Mongo index -> user-service -> 나머지 순으로 기동한다. ai-service의 LLM 후보는 local 프로파일의 Ollama 하나라 먼저 준비됐는지 본다.
+- 인프라 -> Mongo index -> user-service -> 나머지 순으로 기동한다.
+- ai-service의 LLM 후보는 local 프로파일의 Ollama 하나라 먼저 준비됐는지 본다.
 - 확인 절차는 [docs/전체-사이클-스모크.md](./docs/전체-사이클-스모크.md)에 있다.
 
 ```sh

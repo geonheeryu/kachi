@@ -40,10 +40,13 @@ _Aggregate Root_
 
 #### 규칙(Rules)
 
-- 불변이며 전이 메서드는 version을 하나 올린 새 인스턴스를 반환한다. 저장소는 직전 version을 조건으로 쓴다(CAS).
-- 전이는 OPEN에서만 가능하다. CLOSED는 종단 상태이고, 닫힌 뒤 온 같은 사건의 기사는 새 story가 되어 `parentStoryId`로 이어진다.
-- `attach`·`absorb`는 centroid의 임베딩 모델이 같아야 한다. 다른 모델의 벡터는 평균할 수 없다.
-- `mergedInto`는 CLOSED에서만, `closedAt`은 CLOSED와 함께만 존재한다. 자기 자신을 흡수하거나 자기 자신의 후속일 수 없다.
+- 불변이며 전이 메서드는 version을 하나 올린 새 인스턴스를 반환한다.
+- 저장소는 직전 version을 조건으로 쓴다(CAS).
+- 전이는 OPEN에서만 가능하다. CLOSED는 종단 상태다.
+- 닫힌 뒤 온 같은 사건의 기사는 새 story가 되어 `parentStoryId`로 이어진다.
+- `attach`·`absorb`는 centroid의 임베딩 모델이 같아야 한다.
+- `mergedInto`는 CLOSED에서만, `closedAt`은 CLOSED와 함께만 존재한다.
+- 자기 자신을 흡수하거나 자기 자신의 후속일 수 없다.
 
 ### 스토리 식별자(StoryId)
 
@@ -152,7 +155,8 @@ _Value Object_
 _Enum_
 
 - `BGE_M3`: code `bge-m3`, 1024차원
-- 정체(code·modelId·차원)는 enum이, 주소·시간은 yaml이 정한다. `ofCode`는 모르는 코드면 실패한다
+- 정체(code·modelId·차원)는 enum이, 주소·시간은 yaml이 정한다
+- `ofCode`는 모르는 코드면 실패한다
 
 ### 판정기(StoryJudge)
 

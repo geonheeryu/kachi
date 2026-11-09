@@ -209,7 +209,7 @@ story별 연속 실패 누적과 격리 상태다. 격리된 story는 요약 대
 
 #### 규칙(Rules)
 
-- 격리 임계치는 1 이상이어야 하고, 연속 실패가 임계치에 도달하면 `QUARANTINED`로 전이한다. 임계치는 설정 `kachi.ai.quarantine.failure-threshold`의 값이다.
+- 격리 임계치는 1 이상이어야 하고, 연속 실패가 임계치에 도달하면 `QUARANTINED`로 전이한다.
 - 격리 상태에서 들어온 실패/성공 기록은 무시한다.
 - 격리된 story만 해제할 수 있다. 자동 해제는 두지 않는다.
 - story 탓 실패만 연속 실패로 센다.
@@ -258,8 +258,10 @@ ai-service가 요약 대상으로 추적하는 story의 상태다. 요약 시점
 
 - `open`으로 여는 story는 키워드가 하나 이상이고 기사 수가 1 이상이다.
 - 키워드와 기사 수는 이벤트가 실어 온 스냅샷의 합집합과 최댓값으로만 자란다.
-- 흡수된 story는 기사를 받지 않고 다른 story를 흡수하지도 않는다. story는 자신에게 흡수될 수 없다.
-- 요약된 기사 수는 1 이상 미요약 수 이하여야 한다. 남은 미요약이 0일 때만 `oldestPendingAt`이 null이다.
+- 흡수된 story는 기사를 받지 않고 다른 story를 흡수하지도 않는다.
+- story는 자신에게 흡수될 수 없다.
+- 요약된 기사 수는 1 이상 미요약 수 이하여야 한다.
+- 남은 미요약이 0일 때만 `oldestPendingAt`이 null이다.
 - 자리표시는 키워드가 비어 있고 기사 수와 미요약 수가 0이다. `story.merged`가 흡수된 story의 기사보다 먼저 온 경우에 만든다.
 
 ### story 기사 사본(AiStoryArticle)
@@ -462,7 +464,8 @@ _Aggregate Root_
 #### 규칙(Rules)
 
 - 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, PUBLISHING -> PENDING(재시도), DEAD -> PENDING(운영자 복구). 자동 복구는 두지 않는다.
-- 불변이며 전이 메서드는 새 인스턴스를 반환한다. 상태에 맞지 않는 전이 요청은 예외를 던진다.
+- 불변이며 전이 메서드는 새 인스턴스를 반환한다.
+- 상태에 맞지 않는 전이 요청은 예외를 던진다.
 - 늦은 결과는 도메인이 아니라 저장소의 CAS가 거른다. finalize는 `claim`을 기대값으로 쓴다.
 - `claim`은 PUBLISHING에서만 존재하고, PUBLISHED는 `publishedAt`을 갖는다.
 - `eventKey`·`partitionKey`·`payload`는 빈 값일 수 없다.
@@ -504,7 +507,8 @@ _Enum_
 
 - `GROQ`, `MISTRAL`, `OLLAMA`, `OPENROUTER`, `TOGETHER`, `CEREBRAS`, `MOONSHOT`
 - 속성: `code`(영속 문서·이벤트·서킷 이름에 쓰는 고정 문자열), `api`
-- 한 계정으로 부르는 서비스 하나. 상수명은 회사명이고 과금 상태는 이름에 넣지 않는다.
+- 한 계정으로 부르는 서비스 하나.
+- 상수명은 회사명이고 과금 상태는 이름에 넣지 않는다.
 
 ### 모델(LlmModel)
 
@@ -512,15 +516,17 @@ _Enum_
 
 - `GROQ_QWEN3_27B`, `MISTRAL_SMALL_2603`, `OLLAMA_QWEN3_27B`
 - 속성: `provider`, `code`(요청에 싣는 wire id), `options`(`LlmRequestOptions`), `qualifiedCode`(`provider.code/code`, 파생)
-- 실호출 검증을 통과한 것만 둔다. 제공이 끝난 모델은 상수를 지운다.
-- `-latest` 같은 이동 alias는 쓰지 않는다. 어느 날 다른 모델이 응답해도 알 길이 없다.
+- 실호출 검증을 통과한 것만 둔다.
+- 제공이 끝난 모델은 상수를 지운다.
+- `-latest` 같은 이동 alias는 쓰지 않는다.
 
 ### 용도(LlmUse)
 
 _Enum_
 
 - `NEWS_SUMMARY`, `STORY_SUMMARY`, `KEYWORD_EXPANSION`
-- `LlmProviderPort`의 메서드와 1:1이다. 용도마다 후보 모델의 순서가 따로 있다.
+- `LlmProviderPort`의 메서드와 1:1이다.
+- 용도마다 후보 모델의 순서가 따로 있다.
 
 ### 과금 방식(LlmBilling)
 
@@ -536,17 +542,21 @@ _Value Object_
 
 - `reasoningEffort`: `OMIT`, `NONE`, `LOW`, `MEDIUM`, `HIGH`, `MAX`
 - `thinking`: `OMIT`, `ENABLED`, `DISABLED`
-- `OMIT`은 요청에 그 필드를 싣지 않는다. 모든 모델 상수가 모든 값을 명시하므로 새 값이 생기면 컴파일이 누락을 잡는다.
+- `OMIT`은 요청에 그 필드를 싣지 않는다.
+- 모든 모델 상수가 모든 값을 명시한다. 새 값이 생기면 컴파일이 누락을 잡는다.
 
 ### 프롬프트(LlmPrompt / NewsSummaryPrompt / StorySummaryPrompt / KeywordExpansionPrompt)
 
 _Value Object_
 
 - `use`, `version`(`PromptVersion`), `system`, `maxTokens`
-- 용도마다 object 하나가 본문과 버전을 한 파일에 둔다. 본문·입력 모양·출력 형식이 바뀔 때만 버전을 올리고 모델 교체는 대상이 아니다.
-- user 메시지는 자연어가 아니라 입력 객체의 JSON이다. system이 그 값을 인용 데이터로 선언해 기사 제목·키워드 속 지시문이 명령으로 읽히지 않게 한다.
-- 요약 입력은 `NewsSummaryPrompt.Article`(source·title·publishedAt)이다. domain이 application의 뉴스 모델을 import하지 않기 위해서다.
-- story 요약 입력은 story 키워드, 직전 버전 요약(`StorySummaryPrompt.PreviousSummary`, 첫 버전은 null), 새 기사(`StorySummaryPrompt.Article`: source·title·excerpt·publishedAt)다. 응답에는 `developmentKind`가 더해진다.
+- 용도마다 object 하나가 본문과 버전을 한 파일에 둔다.
+- 본문·입력 모양·출력 형식이 바뀔 때만 버전을 올리고 모델 교체는 대상이 아니다.
+- user 메시지는 자연어가 아니라 입력 객체의 JSON이다.
+- system이 입력 값을 인용 데이터로 선언해 기사 제목·키워드 속 지시문이 명령으로 읽히지 않게 한다.
+- 요약 입력은 `NewsSummaryPrompt.Article`(source·title·publishedAt)이다.
+- story 요약 입력은 story 키워드, 직전 버전 요약(`StorySummaryPrompt.PreviousSummary`, 첫 버전은 null), 새 기사(`StorySummaryPrompt.Article`: source·title·excerpt·publishedAt)다.
+- story 요약 응답에는 `developmentKind`가 더해진다.
 - story 요약 입력은 키워드 20개, 기사 50건까지 싣고 기사의 제목·발췌문·출처를 문자 수 상한에서 자른다.
 
 ### 프롬프트 버전(PromptVersion)
@@ -653,7 +663,8 @@ _Aggregate Root_
 
 - 정규화 후 확장 키워드는 하나 이상이어야 한다.
 - 확장 키워드는 원본 키워드와 함께 추적되어야 한다.
-- 같은 원본 키워드, prompt version 조합은 중복 저장하지 않는다 (저장소 unique 제약). model은 기록 필드다.
+- 같은 원본 키워드, prompt version 조합은 중복 저장하지 않는다 (저장소 unique 제약).
+- model은 기록 필드다.
 - LLM 응답이 비어 있거나 파싱할 수 없으면 실패로 처리하고 결과를 저장하지 않는다.
 
 ### 확장 식별자(KeywordExpansionId)

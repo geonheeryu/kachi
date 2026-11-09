@@ -166,7 +166,8 @@ _Aggregate Root_
 
 #### 규칙(Rules)
 
-- 사용자·키워드당 하나다 (저장소 unique `(user_id, keyword_id)`). 같은 사용자가 `Tesla` 다음 `tesla`를 등록하면 중복이다.
+- 사용자·키워드당 하나다 (저장소 unique `(user_id, keyword_id)`).
+  - 예: 같은 사용자가 `Tesla` 다음 `tesla`를 등록하면 중복이다
 - 채널은 하나 이상이어야 한다.
 - 등록·변경 시점에 각 채널에 그 사용자의 `ACTIVE` 바인딩이 있어야 한다 (application 계층에서 강제한다).
   바인딩이 나중에 해지돼도 구독은 그대로 두고, 수신자 조회가 그 채널을 걸러낸다.
@@ -232,7 +233,8 @@ createWithAddress ──▶ ACTIVE ◀── completeLink ── PENDING ◀─�
 
 - 사용자·채널당 하나다 (저장소 unique `(user_id, channel)`).
 - 주소의 채널은 바인딩의 채널과 같아야 한다.
-- `ACTIVE`일 때만 주소가 있고, `PENDING`일 때만 토큰 해시가 있다. 토큰 해시와 만료 시각은 함께 있어야 한다.
+- `ACTIVE`일 때만 주소가 있고, `PENDING`일 때만 토큰 해시가 있다.
+- 토큰 해시와 만료 시각은 함께 있어야 한다.
 - 이미 해지된 바인딩은 다시 해지할 수 없다.
 - 주소는 저장소에 AES-256-GCM 암호문으로만 남는다 (암호화는 persistence adapter의 책임이다).
 
@@ -254,7 +256,8 @@ _Value Object_
   - `SLACK`: `https://hooks.slack.com/` 로 시작하는 webhook URL
   - `DISCORD`: `https://discord.com/api/webhooks/` 또는 `https://discordapp.com/api/webhooks/` 로 시작하는 webhook URL
   - `TELEGRAM`: 숫자 chat id (음수 허용)
-- `masked()`: URL은 host까지, 그 외는 끝 두 글자만 남긴다. `toString()`도 마스킹한 값이라 로그에 원문이 남지 않는다.
+- `masked()`: URL은 host까지, 그 외는 끝 두 글자만 남긴다.
+- `toString()`: 마스킹한 값. 로그에 원문이 남지 않는다.
 
 ### 연결 토큰(LinkToken)
 
