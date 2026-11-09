@@ -1,7 +1,7 @@
 package me.rgunny.kachi.e2e
 
 import me.rgunny.kachi.ai.contract.AiDevelopmentKind
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.e2e.support.KafkaSupport
 import me.rgunny.kachi.e2e.support.NotificationStore
 import me.rgunny.kachi.e2e.support.PrometheusMetrics
@@ -48,7 +48,7 @@ class StorySummaryNotificationE2ETest : KachiCycleE2ETestBase() {
 
         // B. ai-service가 그 story의 첫 요약 버전을 schemaVersion 2 계약으로 발행한다.
         val summary = readSummary(awaitSummaryRecordOf(storyId))
-        assertEquals(AiSummaryCreatedEventV2.CURRENT_SCHEMA_VERSION, summary.schemaVersion)
+        assertEquals(AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION, summary.schemaVersion)
         assertEquals(storyId, summary.storyId)
         assertEquals(1L, summary.version)
         assertEquals(listOf(keyword.canonicalKey), summary.keywords)

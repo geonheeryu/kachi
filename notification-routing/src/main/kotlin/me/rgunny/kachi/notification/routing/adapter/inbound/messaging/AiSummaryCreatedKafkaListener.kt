@@ -2,7 +2,7 @@ package me.rgunny.kachi.notification.routing.adapter.inbound.messaging
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.RouteSummaryNotificationUseCase
 import me.rgunny.kachi.notification.routing.application.service.RoutingEventKey
 import me.rgunny.kachi.notification.routing.domain.RoutingJobKind
@@ -61,9 +61,9 @@ class AiSummaryCreatedKafkaListener(
         )
     }
 
-    private fun readEvent(payload: String): AiSummaryCreatedEventV2 {
+    private fun readEvent(payload: String): AiSummaryCreatedEvent {
         return try {
-            jsonMapper.readValue(payload, AiSummaryCreatedEventV2::class.java)
+            jsonMapper.readValue(payload, AiSummaryCreatedEvent::class.java)
         } catch (exception: Exception) {
             throw InvalidAiEventMessageException("invalid ai summary created payload", exception)
         }

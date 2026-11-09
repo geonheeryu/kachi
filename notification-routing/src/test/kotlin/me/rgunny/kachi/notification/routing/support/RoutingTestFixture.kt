@@ -3,7 +3,7 @@ package me.rgunny.kachi.notification.routing.support
 import me.rgunny.kachi.ai.contract.AiDevelopmentKind
 import me.rgunny.kachi.ai.contract.AiFailureReason
 import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.ai.contract.AiSummarySentiment
 import me.rgunny.kachi.notification.routing.config.NotificationRoutingProperties
 import java.time.Clock
@@ -48,7 +48,7 @@ object RoutingTestFixture {
     }
 
     fun summaryCreatedEvent(
-        schemaVersion: Int = AiSummaryCreatedEventV2.CURRENT_SCHEMA_VERSION,
+        schemaVersion: Int = AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION,
         summaryId: String = "summary-1",
         storyId: String = "story-1",
         version: Long = 1,
@@ -56,8 +56,8 @@ object RoutingTestFixture {
         title: String = "NVIDIA and TSMC expand partnership",
         content: String = "NVIDIA and TSMC announced a new plant.",
         sourceNewsCount: Int = 3,
-    ): AiSummaryCreatedEventV2 {
-        return AiSummaryCreatedEventV2(
+    ): AiSummaryCreatedEvent {
+        return AiSummaryCreatedEvent(
             schemaVersion = schemaVersion,
             summaryId = summaryId,
             storyId = storyId,

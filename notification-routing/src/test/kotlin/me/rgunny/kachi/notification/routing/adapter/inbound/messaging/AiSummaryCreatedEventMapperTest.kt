@@ -1,6 +1,6 @@
 package me.rgunny.kachi.notification.routing.adapter.inbound.messaging
 
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.model.RouteSummaryCommand
 import me.rgunny.kachi.notification.routing.application.port.inbound.routing.model.SummarySentiment
 import me.rgunny.kachi.notification.routing.support.RoutingTestFixture
@@ -70,7 +70,7 @@ class AiSummaryCreatedEventMapperTest {
         assertFailsWith<IllegalArgumentException> { toCommand(RoutingTestFixture.summaryCreatedEvent(title = " ")) }
     }
 
-    private fun toCommand(event: AiSummaryCreatedEventV2): RouteSummaryCommand {
+    private fun toCommand(event: AiSummaryCreatedEvent): RouteSummaryCommand {
         return AiSummaryCreatedEventMapper.toCommand(event)
     }
 }

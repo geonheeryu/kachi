@@ -1,6 +1,6 @@
 package me.rgunny.kachi.e2e
 
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.e2e.support.JsonHttp
 import me.rgunny.kachi.e2e.support.JwtSupport
 import me.rgunny.kachi.e2e.support.KachiCluster
@@ -111,11 +111,11 @@ abstract class KachiCycleE2ETestBase {
         return records.single()
     }
 
-    protected fun readSummary(record: ConsumerRecord<String, String>): AiSummaryCreatedEventV2 {
-        return http.jsonMapper.readValue(record.value(), AiSummaryCreatedEventV2::class.java)
+    protected fun readSummary(record: ConsumerRecord<String, String>): AiSummaryCreatedEvent {
+        return http.jsonMapper.readValue(record.value(), AiSummaryCreatedEvent::class.java)
     }
 
-    protected fun summaryRequestId(summary: AiSummaryCreatedEventV2, userId: String, channel: String): String {
+    protected fun summaryRequestId(summary: AiSummaryCreatedEvent, userId: String, channel: String): String {
         return "sum:${summary.storyId}:${summary.version}:u:$userId:c:$channel"
     }
 

@@ -102,7 +102,7 @@ key는 storyId다.
 
 | eventType | topic | 계약 |
 | --- | --- | --- |
-| `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEventV2`(schemaVersion 2) |
+| `SUMMARY_CREATED` | `ai.summary.created` | `AiSummaryCreatedEvent`(schemaVersion 2) |
 | `STORY_SPLIT_REQUESTED` | `ai.story.split-requested` | `AiStorySplitRequestedEvent` |
 | `STORY_QUARANTINED` | `ai.story.quarantined` | `AiStoryQuarantinedEvent` |
 

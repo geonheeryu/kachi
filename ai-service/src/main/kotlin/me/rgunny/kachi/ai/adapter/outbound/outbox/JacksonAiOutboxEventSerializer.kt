@@ -9,7 +9,7 @@ import me.rgunny.kachi.ai.contract.AiDevelopmentKind
 import me.rgunny.kachi.ai.contract.AiFailureReason
 import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
 import me.rgunny.kachi.ai.contract.AiStorySplitRequestedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.ai.contract.AiSummarySentiment
 import me.rgunny.kachi.ai.domain.summary.NewsSummarySentiment
 import me.rgunny.kachi.ai.domain.summary.StoryDevelopmentKind
@@ -35,8 +35,8 @@ class JacksonAiOutboxEventSerializer(
         return jsonMapper.writeValueAsString(contract)
     }
 
-    private fun toContract(event: StorySummaryCreatedEvent): AiSummaryCreatedEventV2 {
-        return AiSummaryCreatedEventV2(
+    private fun toContract(event: StorySummaryCreatedEvent): AiSummaryCreatedEvent {
+        return AiSummaryCreatedEvent(
             schemaVersion = event.schemaVersion,
             summaryId = event.summaryId.toString(),
             storyId = event.storyId.toString(),

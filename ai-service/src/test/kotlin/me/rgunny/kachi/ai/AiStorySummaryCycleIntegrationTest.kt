@@ -17,7 +17,7 @@ import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderAdminPort
 import me.rgunny.kachi.ai.contract.AiDevelopmentKind
 import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
 import me.rgunny.kachi.ai.contract.AiStorySplitRequestedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.ai.domain.llm.LlmModel
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxClaim
 import me.rgunny.kachi.ai.domain.outbox.AiOutboxStatus
@@ -124,8 +124,8 @@ class AiStorySummaryCycleIntegrationTest {
         assertEquals(1, relayed.published)
         assertEquals(AiOutboxStatus.PUBLISHED.name, outboxCollection.findAll().single().status)
         val record = recordsOf(AiTestFixture.EVENT_TOPIC_SUMMARY_CREATED, key = storyId.toString(), expected = 1).single()
-        val event = jsonMapper.readValue(record.value(), AiSummaryCreatedEventV2::class.java)
-        assertEquals(AiSummaryCreatedEventV2.CURRENT_SCHEMA_VERSION, event.schemaVersion)
+        val event = jsonMapper.readValue(record.value(), AiSummaryCreatedEvent::class.java)
+        assertEquals(AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION, event.schemaVersion)
         assertEquals(storyId.toString(), event.storyId)
         assertEquals(1, event.version)
         assertEquals(listOf("nvidia", "gpu"), event.keywords)

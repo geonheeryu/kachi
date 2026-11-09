@@ -5,7 +5,7 @@ import java.time.Instant
 /**
  * ai-service가 story 요약 버전 생성을 알릴 때 사용하는 이벤트 계약.
  */
-data class AiSummaryCreatedEventV2(
+data class AiSummaryCreatedEvent(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val summaryId: String,
     val storyId: String,
