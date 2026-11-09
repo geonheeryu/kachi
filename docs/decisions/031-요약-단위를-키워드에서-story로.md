@@ -178,7 +178,7 @@ story-service는 임베딩 입력과 재처리에 필요한 기사 값을 자기
 - ADR 032: collector 기사 이벤트 발행과 `collector-contract`. 발췌문, URL 정규화, compaction.
 - ADR 033: story-service 조립. 도메인, 포트, 판정 규칙, 주기 작업, 골드셋 결과.
 - ADR 034: story 요약. 트리거 정책, `developmentKind`, `StorySummary` 멱등.
-- ADR 035: `ai.summary.created` v2와 routing의 storyId 멱등.
+- ADR 035: notification-routing의 v2 소비와 storyId 멱등.
 - 개정: ADR 011(newsHash 폐지), 020(window·watermark 절 폐지, 실행 모델과 격리는 유지), 023·025·027(계약과 멱등 키).
 - 수신자별 발송 빈도(즉시·시간·일 단위 묶음)는 별도 결정이다.
 

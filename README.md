@@ -59,12 +59,12 @@ user-service
 
 ---
 
-## 5. 진행 상태
+## 5. 구현 범위
 
 도메인 세부 규칙은 [도메인 모델](./docs/도메인모델.md)을 기준으로 관리한다.  
 설계 결정의 배경과 trade-off는 [decisions](./docs/decisions)에 기록한다.
 
-| 서비스 | 진행 상태 | 상세 문서 |
+| 서비스 | 구현 범위 | 상세 문서 |
 | --- | --- | --- |
 | `user-service` | 사용자, canonical 키워드·구독, 채널 바인딩(암호화 주소, Telegram 연결 링크), 활성 키워드·구독·바인딩 internal API, OAuth2/JWT, refresh token, MySQL/Redis 저장소 구현 | [user-service README](./user-service/README.md) |
 | `collector-service` | 뉴스 도메인, Google/Naver/Finnhub provider, user-service 키워드 조회, MongoDB 저장, scheduler/internal API 실행 진입점, 기사 outbox 기록과 relay의 `collector.news.collected` 발행(`collector-contract` 모듈) 구현 | [collector-service README](./collector-service/README.md) |
@@ -201,6 +201,10 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 | [포트 구성](./docs/포트-구성.md) | 로컬 호스트 공개 포트, 컨테이너 인바운드 포트, 서비스 간 연결 계약 |
 | [테스트 전략](./docs/테스트전략.md) | unit, slice, integration, e2e 테스트 분류와 인프라 테스트 기준 |
 | [collector-service WebClient 설정](./docs/collector-webclient-설정.md) | 외부 뉴스 provider WebClient 설정값과 근거 |
+| [알림 멱등 가드](./docs/알림-멱등-가드.md) | 알림이 한 번만 가게 하는 네 층의 가드와 각 층이 막는 상황 |
+| [전체 사이클 스모크](./docs/전체-사이클-스모크.md) | 실제 LLM·채널로 수집에서 알림 수신까지 사람이 확인하는 절차 |
+| [사람이 해야 하는 일](./docs/user-intervention.md) | CLI로 끝나지 않는 일의 목록 |
+| 도메인 모델 컨텍스트별 문서 | [user](./docs/도메인모델-user.md), [collector](./docs/도메인모델-collector.md), [story](./docs/도메인모델-story.md), [ai](./docs/도메인모델-ai.md), [notification](./docs/도메인모델-notification.md), [history](./docs/도메인모델-history.md) |
 | [001. user-service에 Keyword 포함](./docs/decisions/001-user-service에-keyword-포함.md) | Keyword 경계 결정 |
 | [002. ArchUnit으로 아키텍처 검증](./docs/decisions/002-archunit으로-아키텍처-검증.md) | 아키텍처 규칙 자동 검증 결정 |
 | [003. UUID v7과 ID Value Object 사용](./docs/decisions/003-uuid-v7과-id-value-object-사용.md) | 식별자 생성 전략과 타입 분리 결정 |

@@ -119,7 +119,9 @@ sender는 vendor 응답을 `RetryFailure(source, category)`로 바꿔 돌려준�
 
 ### fan-out과 결정적 requestId
 
-routing은 계약 모듈에만 의존하는 독립 프로세스다. fan-out이 접수 API와 자원을 나눠 쓰지 않게 하려는 분리다. 요청 키는 입력만으로 정해진다: `sum:{summaryId}:u:{recipientId}:c:{CHANNEL}`. routing이 중간에 죽어 같은 이벤트를 처음부터 다시 펼쳐도 같은 `requestId`가 나오므로 접수 쪽 멱등이 거른다. 그래서 routing 안에 진행 커서나 outbox를 두지 않았다.
+routing은 계약 모듈에만 의존하는 독립 프로세스다. fan-out이 접수 API와 자원을 나눠 쓰지 않게 하려는 분리다.
+
+요청 키는 입력만으로 정해진다: 요약 알림은 `sum:{summaryId}:u:{recipientId}:c:{CHANNEL}`, 키워드 격리 알림은 `qrt:{eventKey}:u:{recipientId}:c:{CHANNEL}`. 격리 알림의 수신자는 user-service에서 조회한 관리자다. routing이 중간에 죽어 같은 이벤트를 처음부터 다시 펼쳐도 같은 `requestId`가 나오므로 접수 쪽 멱등이 거른다. 그래서 routing 안에 진행 커서나 outbox를 두지 않았다.
 
 상세문서: [ADR 025](decisions/025-키워드-구독과-알림-라우팅.md) · [ADR 027](decisions/027-알림-라우팅.md)
 

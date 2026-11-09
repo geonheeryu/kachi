@@ -9,7 +9,7 @@ import java.time.Instant
  *
  * DB 트랜잭션과 메시지 broker 발행을 같은 보장 단위로 묶는 패턴.
  * 같은 tx 에서 notification + notification_outbox 동시 commit 후,
- * 즉시 path (AFTER_COMMIT listener) 또는 폴링 시 broker 로 발행.
+ * 폴링으로 broker 에 발행.
  *
  * 처리 권한 획득은 PENDING -> PUBLISHING CAS claim 단계로 분리한다.
  * claim 에 성공한 인스턴스만 publish 를 수행하며, 결과는 callback 에서 별도 트랜잭션으로 반영.

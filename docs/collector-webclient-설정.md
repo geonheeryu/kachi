@@ -9,7 +9,7 @@
 - provider별 base URL과 endpoint path를 분리한다.
 - provider별 WebClient bean을 분리한다.
 - 여러 WebClient가 생기므로 `@Qualifier`로 주입 대상을 명시한다.
-- timeout과 응답 크기 제한은 코드 기본값과 설정값으로 관리한다.
+- timeout과 응답 크기 제한은 `application.yaml`의 설정값으로 관리한다.
 - 실제 운영 데이터가 쌓이면 provider별로 조정한다.
 
 ## 기본 설정
@@ -160,7 +160,7 @@ ceid={country-code}:{language-code}
 
 | 설정 | 값 | 근거 |
 | --- | --- | --- |
-| `enabled` | `false` | credential이 필요하므로 명시적으로 켠 경우에만 사용한다. |
+| `enabled` | `true` | credential이 없으면 기동에 실패한다. |
 | `base-url` | `https://openapi.naver.com` | provider host와 endpoint path를 분리한다. |
 | `news-search-path` | `/v1/search/news.json` | Naver Search API 뉴스 검색 endpoint다. |
 | `client-id` | `${NAVER_CLIENT_ID}` | Naver API 인증 header에 사용한다. |
@@ -174,7 +174,7 @@ Naver 응답 변환 기준:
 
 - `title`은 HTML entity unescape 후 HTML tag를 제거한다.
 - URL은 `originallink`를 우선 사용하고, 없으면 `link`를 사용한다.
-- `pubDate`는 RFC 1123 형식으로 파싱하고, 실패하면 `publishedAt=null`로 둔다.
+- `pubDate`는 RFC 1123 형식으로 파싱하고, 실패하면 그 item을 제외한다.
 
 ## Finnhub Company News
 
@@ -194,7 +194,7 @@ Naver 응답 변환 기준:
 
 | 설정 | 값 | 근거 |
 | --- | --- | --- |
-| `enabled` | `false` | API key가 필요하므로 명시적으로 켠 경우에만 사용한다. |
+| `enabled` | `true` | API key가 없으면 기동에 실패한다. |
 | `base-url` | `https://finnhub.io` | provider host와 endpoint path를 분리한다. |
 | `company-news-path` | `/api/v1/company-news` | Finnhub Company News endpoint다. |
 | `api-key` | `${FINNHUB_API_KEY}` | Finnhub API 인증 header에 사용한다. |
@@ -207,7 +207,7 @@ Finnhub 응답 변환 기준:
 - `from`은 오늘 기준 `lookback-days` 전 날짜, `to`는 오늘 날짜로 요청한다.
 - `headline`을 제목으로 사용한다.
 - `url`을 원문 URL로 사용한다.
-- `datetime`은 UNIX timestamp seconds로 파싱하고, 없거나 epoch 이전이면 `publishedAt=null`로 둔다.
+- `datetime`은 UNIX timestamp seconds로 파싱하고, 없거나 epoch 이전이면 그 item을 제외한다.
 
 ## 조정 기준
 

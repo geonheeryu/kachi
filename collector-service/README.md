@@ -126,7 +126,7 @@ POST /api/v1/internal/collections/news
 }
 ```
 
-이미 수집이 실행 중이면 `409 CONFLICT`를 반환한다.
+이미 수집이 실행 중이면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`을 반환한다.
 
 저장 뉴스 조회:
 
@@ -135,8 +135,8 @@ GET /api/v1/internal/news?keyword=NVIDIA&from=2026-06-01T00:00:00Z&to=2026-06-02
 ```
 
 이 API는 `ai-service`가 요약 대상 뉴스를 읽기 위한 내부 계약이다.
-`keyword`는 필수이고, `from`, `to`, `limit`은 선택값이다.
-`excerpt`는 provider가 준 발췌문이고 `language`는 provider 설정이 정한 언어다.
+`keyword`는 필수이고, `from`, `to`, `limit`은 선택값이다. `limit`은 1 이상 100 이하이고 생략하면 20이다.
+`excerpt`는 provider가 준 발췌문이고 `language`는 기사 언어다. Google은 설정 `language-code`의 값이고 Naver는 `ko`, Finnhub은 `en`으로 고정이다.
 모든 필드가 항상 있다. 제목·발췌문·URL·발행 시각 중 하나라도 없는 provider item은 수집 시점에 제외된다.
 
 ```json
@@ -166,7 +166,7 @@ GET /api/v1/internal/collector/outboxes?status=DEAD&limit=50
 POST /api/v1/internal/collector/outboxes/{outboxId}/recover
 ```
 
-조회 기본값은 `status=DEAD`, `limit=50`이고 payload는 응답에 넣지 않는다.
+조회 기본값은 `status=DEAD`, `limit=50`이고 `limit`은 1 이상 500 이하다. payload는 응답에 넣지 않는다.
 복구는 DEAD 행을 PENDING으로 되돌리기만 하고 발행은 다음 relay tick이 한다. 없는 행은 `404`, DEAD가 아닌 행은 `409`다.
 
 ## 이벤트 발행
@@ -263,7 +263,7 @@ kachi:
         display: 100
         sort: date
 ```
-기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_NAVER_ENABLED=false`로 끈다.
+기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_PROVIDERS_NAVER_ENABLED=false`로 끈다.
 
 ### Finnhub Company News
 
@@ -280,7 +280,7 @@ kachi:
         lookback-days: 7
 ```
 
-기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_FINNHUB_ENABLED=false`로 끈다.
+기본으로 켜져 있고 credential이 없으면 기동에 실패한다. 쓰지 않을 환경은 `KACHI_COLLECTOR_PROVIDERS_FINNHUB_ENABLED=false`로 끈다.
 
 ## 저장소
 
@@ -306,18 +306,19 @@ docker compose -f infra/docker-compose.yml -f infra/docker-compose.mongo.yml up 
 
 ```text
 server.port=8082
-MONGO_HOST=localhost
-MONGO_PORT=27017
-MONGO_DATABASE=kachi_collector
+spring.mongodb.uri=mongodb://localhost:27017/kachi_collector?replicaSet=rs0
+spring.kafka.bootstrap-servers=localhost:9092
 KACHI_USER_SERVICE_BASE_URL=http://localhost:8080
-KACHI_COLLECTOR_NEWS_SCHEDULER_ENABLED=false
+kachi.collector.scheduler.news.enabled=true
 ```
 
 실행:
 
+저장소 루트에서 실행한다.
+
 ```sh
 set -a
-source ../.env.local
+source .env.local
 set +a
 ./gradlew :collector-service:bootRun
 ```

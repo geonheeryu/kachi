@@ -26,6 +26,8 @@ Scheduler 또는 Internal API
               -> MongoDB
 ```
 
+story 이벤트를 소비해 요약하는 경로는 [story 요약](#story-요약) 절에 있다.
+
 WebFlux와 reactive MongoDB를 쓴다.
 LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요하므로 MVC보다 WebFlux 구성이 더 적합하다.
 
@@ -54,9 +56,8 @@ LLM 호출은 외부 I/O가 많고 timeout, retry, rate limit 대응이 필요�
 | 키워드 확장 | `kachi.ai.scheduler.keyword-expansion` | 24h | `false` |
 | story 요약 | `kachi.ai.scheduler.story-summary` | 5m | `true` |
 
-뉴스 요약 scheduler는 매 실행마다 `now - lookback ~ now` 기간의 뉴스를 요약 대상으로 삼는다.
-`lookback`은 실행 주기보다 길게 두어 tick 사이에 수집된 뉴스가 누락되지 않게 하고,
-겹침으로 생기는 중복 요약은 `newsHash` 재사용이 막는다.
+뉴스 요약 scheduler의 요약 구간은 저장된 watermark에서 `overlap`(기본 5m)만큼 물러난 시각부터 now까지다. 구간의 시작은 `now - max-lookback`(기본 6h)보다 앞서지 않는다.
+watermark가 없는 첫 실행은 `now - overlap`에서 시작한다. 겹침으로 생기는 중복 요약은 `newsHash` 재사용이 막는다.
 
 story 요약 scheduler는 대기 상한(`max-wait`)을 넘긴 story만 한 tick에 `max-stories-per-tick`(기본 20)개까지 요약한다.
 
@@ -281,7 +282,7 @@ POST /api/v1/internal/ai/news-summaries
 ```
 
 요청 body를 생략하거나 `keywords`가 비어 있으면 `user-service`의 활성 키워드를 조회한다.
-`from`과 `to`가 없으면 서비스 기본 lookback 기간을 사용한다.
+`from`과 `to`가 없으면 collector가 가진 전체 기간의 뉴스를 조회한다. 수동 실행은 watermark를 읽지도 전진시키지도 않는다.
 
 ```json
 {
@@ -320,7 +321,7 @@ POST /api/v1/internal/ai/news-summaries
 }
 ```
 
-이미 같은 AI 작업이 실행 중이면 `409 CONFLICT`를 반환한다.
+키워드 확장과 뉴스 요약 수동 실행은 같은 작업이 이미 실행 중이면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`을 반환한다.
 
 story 요약 버전 조회:
 
@@ -348,6 +349,32 @@ POST /api/v1/internal/ai/story-quarantines/{storyId}/release
 ```
 
 `status`를 생략하면 전체를 돌려준다.
+
+키워드 격리 조회와 해제:
+
+```http
+GET /api/v1/internal/ai/keyword-quarantines?targetType={targetType}&status={TRACKING|QUARANTINED|RELEASED}
+POST /api/v1/internal/ai/keyword-quarantines/{keyword}/release?targetType={targetType}
+```
+
+조회는 `targetType`과 `status`를 생략하면 전체를 돌려준다. 해제의 `targetType`은 생략하면 `NEWS_SUMMARY`다.
+해제할 기록이 없으면 `404 NOT_FOUND`, 격리 상태가 아니면 `409 CONFLICT`다.
+
+요약 watermark 조회:
+
+```http
+GET /api/v1/internal/ai/summary-watermarks
+```
+
+outbox 조회와 복구:
+
+```http
+GET /api/v1/internal/ai/outboxes?status={status}&limit={limit}
+POST /api/v1/internal/ai/outboxes/{outboxId}/recover
+```
+
+조회 기본값은 `status=DEAD`, `limit=50`이고 `limit`은 1 이상 500 이하다.
+복구는 `DEAD` 행을 `PENDING`으로 되돌리고 발행은 relay가 한다. 행이 없으면 `404 NOT_FOUND`, `DEAD`가 아니면 `409 CONFLICT`다.
 
 ## 저장소
 
@@ -418,9 +445,11 @@ kachi.ai.llm.uses.*.candidates=[OLLAMA_QWEN3_27B]
 
 실행:
 
+저장소 루트에서 실행한다.
+
 ```sh
 set -a
-source ../.env.local
+source .env.local
 set +a
 ./gradlew :ai-service:bootRun
 ```

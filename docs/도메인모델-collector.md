@@ -20,7 +20,7 @@ _Aggregate Root_
 - `excerpt`: `NewsExcerpt` provider가 준 발췌문
 - `url`: `NewsUrl` 원문 URL
 - `urlHash`: 정규화 URL의 hash (생성 시 `url.hash`에서 고정)
-- `language`: `NewsLanguage` 기사 언어. provider 설정이 정한다
+- `language`: `NewsLanguage` 기사 언어. Google은 provider 설정의 `language-code`, Naver는 `ko`, Finnhub은 `en`이다
 - `publishedAt`: 발행 시각
 - `collectedAt`: 수집 시각
 - `matchedKeywords`: `List<CollectedKeyword>` 이 뉴스와 매칭된 수집 키워드 목록
@@ -90,8 +90,7 @@ _Value Object_
 
 - `value`: user-service에서 조회한 활성 키워드 참조값
 - `of()`: trim 정규화. 빈 값 불가.
-- user 컨텍스트의 `Keyword`를 collector가 자기 어휘로 받아들이는 경계 값이다.
-  user-service의 도메인 타입을 직접 import하지 않는다.
+- 수집 흐름은 이 타입을 쓰지 않는다.
 
 ### 뉴스 출처(NewsSource)
 

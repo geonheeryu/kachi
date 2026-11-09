@@ -31,6 +31,7 @@ LlmFailure
 ```
 
 판단 축은 둘이고 모두 `code`에서 파생한다. 코드와 어긋난 축을 가진 실패를 만들 수 없게 하기 위해서다.
+`LlmFailureCode`는 application 예외의 에러 코드 규약 `AiErrorCode`를 구현하지 않는다. 두 축이 그 규약 밖에 남고, 얻는 것은 `defaultMessage`를 `message`로 바꾸는 것뿐이다.
 
 - 책임 `LlmFailureAttribution`: 이 실패의 책임이 어디 있는가. `INPUT`(이 키워드의 요청·응답), `MODEL`(모델 하나), `PROVIDER`(계정과 endpoint), `NONE`(우리 가드가 호출 전에 막음).
 - 지속 `transient`: 다음 tick이나 다음 후보에서 저절로 풀리는가.

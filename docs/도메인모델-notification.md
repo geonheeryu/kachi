@@ -2,11 +2,12 @@
 
 notification bounded context의 도메인 모델이다. 도메인과 유스케이스는 notification-core에 있고, 
 notification-service(접수·outbox 발행)와 notification-worker(dispatch·vendor 발송)는 어댑터 전용 모듈이다. 
+notification-routing(fan-out)은 자기 도메인과 유스케이스를 갖는 별도 모듈이다.
 공통 관례는 [도메인모델.md](도메인모델.md)를 따른다.
 
 관련 결정: ADR 012(모듈 설계), 013(outbox dispatch flow), 014(재시도 분류),
 015(outbox 발행 runtime), 016(vendor sender 구조), 017(Mongo 트랜잭션 전제),
-018(재시도 폭주 방지), 024(aggregate 불변화와 finalize CAS), 028(발송 직전 주소 조회와 스킵).
+018(재시도 폭주 방지), 024(aggregate 불변화와 finalize CAS), 027(알림 라우팅), 028(발송 직전 주소 조회와 스킵).
 
 이 컨텍스트의 상태 전이 aggregate는 불변이다. 전이 메서드는 전이 결과를 새 인스턴스로 반환하고 전이 전 인스턴스는 그대로 남는다.
 전이 가드는 최종 방어선이며, 외부 side effect(Kafka 발행, vendor 호출) 뒤의 결과 확정은 전이 전 인스턴스가 들고 있던 claim을
@@ -26,7 +27,7 @@ _Aggregate Root_
 - `requestId`: upstream 요청 멱등 키
 - `requester`: 요청 주체
 - `channel`: `NotificationChannel` 발송 채널
-- `recipientId`: 수신자 식별자(user-service 사용자 id). 주소가 아니며 주소(`address`)는 worker가 발송 직전에 `(recipientId, channel)`로 조회해 sender에만 넘긴다. 알림에는 남지 않는다
+- `recipientId`: 수신자 식별자(user-service 사용자 id). 주소(`address`)가 아니며 알림에는 주소가 남지 않는다
 - `message`: 발송 메시지 (null 허용, 빈 문자열 불가)
 - `origin`: `NotificationOrigin` 출처(summaryId, keyword, userId). 요청 계약에 실려 온 알림만 값을 가진다
 - `requestedAt`: 최초 접수 시각
@@ -87,10 +88,10 @@ _Enum_
 - `PUBLISH_FAILED`: 발행 실패, outbox recovery 대상
 - `PROCESSING`: worker가 발송 claim 후 sender 호출 진행 중
 - `FAILED`: sender 호출 실패, `RETRY_WAIT` 또는 `DEAD` 분기 직전
-- `RETRY_WAIT`: retry topic/backoff 후 재시도 가능한 상태
+- `RETRY_WAIT`: 재시도 가능한 실패 뒤 다음 시도를 기다리는 상태
 - `SENT`: 외부 채널 발송 성공
 - `SUPPRESSED`: 스킵. 수신 주소가 없거나 이미 보낸 알림이라 vendor를 부르지 않고 종료
-- `DEAD`: 자동 재시도 종료, 운영자 수동 재처리 대상 (DLT 진입과 함께)
+- `DEAD`: 자동 재시도 종료, 운영자 수동 재처리 대상
 
 ### 알림 채널(NotificationChannel)
 
@@ -112,7 +113,7 @@ _Value Object_
 _Aggregate Root_
 
 요청 접수와 worker용 dispatch message 발행 사이의 유실을 막는 발행 보장 대기열이다.
-같은 트랜잭션에서 notification과 outbox를 함께 commit한 뒤, 즉시 경로(AFTER_COMMIT listener) 또는 폴링이 broker로 발행한다.
+같은 트랜잭션에서 notification과 outbox를 함께 commit한 뒤, 폴링이 broker로 발행한다.
 
 #### 속성(Attributes)
 
@@ -258,6 +259,59 @@ _Value Object_
 - `value`: DLT 메시지 식별자
 - `fromOriginalRecord(topic, partition, offset)`: 원본 record 좌표에서 결정적으로 생성한다
 
+## 라우팅
+
+notification-routing 모듈의 도메인이다. `ai.summary.created`·`ai.keyword.quarantined` 한 건을 수신자 x 채널만큼의 `notification.requested`로 펼친 기록을 갖는다.
+
+### 라우팅 job(RoutingJob)
+
+_Aggregate Root_
+
+이벤트 1건을 라우팅한 기록이다.
+
+#### 속성(Attributes)
+
+- `id`: `RoutingJobId`
+- `eventKey`: 이벤트 식별 키. 유일하다
+- `kind`: `RoutingJobKind`
+- `keyword`: 이벤트의 키워드
+- `status`: `RoutingJobStatus`
+- `targetCount`: 펼친 대상 수 / `publishedCount`: 접수 topic으로 발행한 건수
+- `createdAt` / `updatedAt` / `completedAt`
+
+#### 행위(Behaviors)
+
+- `static start(eventKey, kind, keyword, now)`: `STARTED`로 만든다. 두 건수는 0이다
+- `static restore(...)`: 저장소 snapshot을 복원한다
+- `complete(targetCount, publishedCount, now)`: `STARTED -> COMPLETED`
+
+#### 규칙(Rules)
+
+- `eventKey`와 `keyword`는 non-blank다.
+- `publishedCount`는 0 이상 `targetCount` 이하다.
+- `completedAt`은 `COMPLETED`일 때만 있다.
+- 같은 이벤트를 다시 받으면 `COMPLETED`는 다시 라우팅하지 않고 `STARTED`는 처음부터 다시 발행한다.
+
+### 라우팅 job 종류(RoutingJobKind)
+
+_Enum_
+
+- `SUMMARY`: 요약 생성. 키워드 구독자 x 채널로 펼친다
+- `QUARANTINE`: 키워드 격리. 관리자 x 채널로 펼친다
+
+### 라우팅 job 상태(RoutingJobStatus)
+
+_Enum_
+
+- `STARTED`: 라우팅 중이거나 도중에 중단된 상태
+- `COMPLETED`: 라우팅 완료
+
+### 라우팅 job 식별자(RoutingJobId)
+
+_Value Object_
+
+- `id`: 시간순 UUID
+
 ## 재시도 모델
 
 `domain/retry/` 패키지에 있다. 기술에 의존하지 않는 순수 모델로, 실패 분류와 재시도 결정이라는
@@ -302,6 +356,8 @@ notification-core가 정의한 표준 실패 코드다. 각 상수가 code/defau
 | `INVALID_RECIPIENT` | VENDOR | VALIDATION_ERROR |
 | `DISPATCH_NOT_READY` | APPLICATION | TRANSIENT_ERROR |
 | `DISPATCH_PROCESSING_TIMEOUT` | APPLICATION | TIMEOUT |
+| `RECIPIENT_RESOLVE_FAILED` | APPLICATION | TRANSIENT_ERROR |
+| `RECIPIENT_RESOLVE_TIMEOUT` | APPLICATION | TIMEOUT |
 
 ### 실패 원천(FailureSource)
 

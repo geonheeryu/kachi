@@ -92,7 +92,8 @@ _Aggregate Root_
 
 #### 규칙(Rules)
 
-- 사본이므로 제목·발췌문은 non-blank만 요구하고 collector의 정규화 규칙을 되풀이하지 않는다.
+- 사본이므로 제목·발췌문·URL은 non-blank만 요구하고 collector의 정규화 규칙을 되풀이하지 않는다.
+- `matchedKeywords`는 하나 이상이다.
 - `decision`은 붙인 시점의 기록이다. 생성 시점에는 merged 판정의 후보 story와 소속이 같아야 하지만, 병합·분리의 `reassign` 뒤에는 소속과 갈라지는 것이 정상이라 복원은 이를 검증하지 않는다.
 
 ### 기사 식별자(NewsId)
@@ -167,7 +168,7 @@ _Enum_
 _Aggregate Root_
 
 - 발행해야 할 story 이벤트 1건과 그 발행 상태. `eventType`·`eventKey`·`partitionKey`·`payload`(생성 시점에 계약 JSON으로 고정)·`status`·`retryCount`·`nextRetryAt`·`claim` 등
-- 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
+- 전이: PENDING -> PUBLISHING(claim) -> PUBLISHED | DEAD, PUBLISHING -> PENDING(재시도 가능한 실패, 한도 미만), DEAD -> PENDING(운영자 복구). 늦은 결과는 저장소의 claim CAS가 거른다
 
 ### 발행 소유권(StoryOutboxClaim)
 

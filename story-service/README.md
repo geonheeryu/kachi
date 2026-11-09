@@ -55,7 +55,7 @@ StoryOutboxRelayScheduler
 | `GET /api/v1/internal/stories/{storyId}` | story와 구성 기사·판정 기록 |
 | `POST /api/v1/internal/stories/{storyId}/merge/{mergedStoryId}` | 운영자 병합. 앞이 뒤를 흡수한다 |
 | `POST /api/v1/internal/stories/{storyId}/split` | body `newsIds[]`를 새 story로 분리. 전체 분리는 거부 |
-| `POST /api/v1/internal/story-index/rebuild` | Mongo 임베딩으로 색인 재구축. started 또는 already-running |
+| `POST /api/v1/internal/story-index/rebuild` | Mongo 임베딩으로 색인 재구축. started 또는 already-running. 실행 lock을 확인할 수 없으면 503 |
 | `GET /api/v1/internal/story-outboxes?status=&limit=` | outbox 조회. status 기본 DEAD |
 | `POST /api/v1/internal/story-outboxes/{outboxId}/recover` | DEAD 행을 PENDING으로. 발행은 relay가 한다 |
 
@@ -87,7 +87,7 @@ relay만 켜고 어댑터가 없으면 기동에 실패한다. test 프로파일
 
 ## Scheduler
 
-주기 작업 셋과 relay가 각자 설정을 갖는다. scheduler 빈은 `enabled`로 막는다.
+주기 작업 셋과 relay가 각자 설정을 갖는다. 주기 작업 셋의 scheduler 빈은 항상 생기고 tick마다 `enabled`를 보고 꺼져 있으면 건너뛴다. relay scheduler는 `enabled`가 꺼져 있으면 빈을 만들지 않는다.
 
 ```yaml
 kachi:
@@ -122,7 +122,7 @@ lock 범위는 주기 작업이 `CLUSTER`, relay가 `INSTANCE`다. 구현은 in-
 | 컬렉션 | 인덱스 | 비고 |
 | --- | --- | --- |
 | `stories` | `{status, lastArticleAt}`, `{mergedInto}` | centroid는 double 배열 |
-| `story_articles` | `{newsId}` unique, `{storyId, attachedAt desc}`, `{collectedAt}` | 임베딩은 float32 Binary |
+| `story_articles` | `{storyId, attachedAt desc}`, `{collectedAt}` | `_id`가 newsId다. 임베딩은 float32 Binary |
 | `story_outboxes` | collector와 같음 | |
 
 Qdrant 컬렉션(`story-articles-bge-m3`)은 파생 캐시다. 점 id는 newsId, payload는 storyId·collectedAt·language이고
@@ -142,6 +142,12 @@ user-service·다른 서비스의 API는 부르지 않는다.
 ```sh
 ./scripts/infra.sh story start     # Mongo, Kafka, TEI 둘, Qdrant
 ./scripts/app.sh story-service start
+```
+
+실제 추론 서버를 부르는 테스트는 `src/realTest`에 있고 `test`·`check`에 끼지 않는다.
+
+```sh
+./scripts/infra.sh tei start && ./gradlew :story-service:realTest
 ```
 
 TEI·Qdrant 주소는 `.env`의 `KACHI_STORY_TEI_EMBEDDING_BASE_URL`·`KACHI_STORY_TEI_RERANKER_BASE_URL`·`KACHI_STORY_QDRANT_HOST`·`KACHI_STORY_QDRANT_GRPC_PORT`로 바꾼다.
