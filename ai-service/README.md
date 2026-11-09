@@ -101,6 +101,9 @@ AiStorySummaryScheduler
 읽을 수 없는 메시지는 `ai.story.dlt`로 보낸다.
 그 밖의 실패는 같은 offset을 backoff(1s에서 2배씩 30s까지)로 다시 처리한다.
 
+story 탓 실패가 연속으로 `kachi.ai.story-quarantine.failure-threshold`(기본 3)에 닿으면 그 story를 격리한다.
+격리된 story는 운영자가 해제할 때까지 요약하지 않는다.
+
 ## 이벤트 발행
 
 요약 생성과 격리, 분리 요청은 outbox에 기록되고, relay가 그 행을 Kafka topic으로 내보낸다.
@@ -116,15 +119,17 @@ key는 키워드 경로에서 keyword, story 경로에서 storyId다.
 | story | `STORY_SPLIT_REQUESTED` | `ai.story.split-requested` | `AiStorySplitRequestedEvent` |
 | story | `STORY_QUARANTINED` | `ai.story.quarantined` | `AiStoryQuarantinedEvent` |
 
-스위치는 셋이고 뜻이 다르다.
+story 경로의 세 이벤트는 요약 버전·격리 전이와 같은 트랜잭션에서 항상 outbox 행을 남긴다. `NO_CHANGE` 버전은 행을 남기지 않는다.
+
+발행 스위치는 둘이다.
 
 | 키 | 뜻 | 기본값 |
 | --- | --- | --- |
 | `kachi.ai.outbox.relay.enabled` | outbox를 읽어 발행 포트로 넘기는 relay | `true` |
 | `kachi.ai.events.enabled` | Kafka 발행 어댑터 | `true` |
-| `kachi.ai.story-summary.events-enabled` | story 경로의 세 이벤트를 outbox에 남길지. env는 `KACHI_AI_STORY_EVENTS_ENABLED`다. 기본값을 꺼 둔 이유는 ADR 034에 있다 | `false` |
 
-relay만 켜고 어댑터가 없으면 기동에 실패한다. local은 앞의 둘을 켜고 test 프로파일은 둘 다 `false`다.
+relay만 켜고 어댑터가 없으면 기동에 실패한다. local은 둘 다 켜고 test 프로파일은 둘 다 `false`다.
+relay를 끈 동안 행은 `PENDING`으로 쌓이고, relay를 켜면 발행된다.
 누가 어떤 채널로 받는지는 이 서비스가 모른다. 요약을 알림으로 fan-out하는 일은 notification-service의 routing이 한다.
 
 ## LLM
@@ -349,6 +354,7 @@ POST /api/v1/internal/ai/story-quarantines/{storyId}/release
 ```
 
 `status`를 생략하면 전체를 돌려준다.
+해제할 기록이 없으면 `404 STORY_QUARANTINE_NOT_FOUND`, 격리 상태가 아니면 `409 STORY_QUARANTINE_NOT_RELEASABLE`이다.
 
 키워드 격리 조회와 해제:
 

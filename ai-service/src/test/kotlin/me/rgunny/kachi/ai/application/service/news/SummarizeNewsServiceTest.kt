@@ -923,7 +923,7 @@ class SummarizeNewsServiceTest {
             summaryWatermarkPersistencePort = watermarkPersistence,
             keywordQuarantinePersistencePort = quarantinePersistence,
             eventSerializer = eventSerializer,
-            quarantinePolicy = AiTestFixture.quarantinePolicy(),
+            quarantinePolicy = AiTestFixture.storyQuarantinePolicy(),
             clock = clock
         )
     }

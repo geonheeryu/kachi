@@ -17,6 +17,8 @@ enum class ErrorCode(
     STORY_SUMMARY_LOCK_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "실행 lock을 확인할 수 없어 story 요약 tick을 시작하지 못했습니다"),
     KEYWORD_QUARANTINE_NOT_FOUND(HttpStatus.NOT_FOUND, "키워드 격리 기록을 찾을 수 없습니다"),
     KEYWORD_QUARANTINE_NOT_RELEASABLE(HttpStatus.CONFLICT, "격리 상태가 아닌 키워드는 해제할 수 없습니다"),
+    STORY_QUARANTINE_NOT_FOUND(HttpStatus.NOT_FOUND, "story 격리 기록을 찾을 수 없습니다"),
+    STORY_QUARANTINE_NOT_RELEASABLE(HttpStatus.CONFLICT, "격리 상태가 아닌 story는 해제할 수 없습니다"),
     AI_OUTBOX_NOT_FOUND(HttpStatus.NOT_FOUND, "outbox 행을 찾을 수 없습니다"),
     AI_OUTBOX_NOT_RECOVERABLE(HttpStatus.CONFLICT, "DEAD 상태가 아닌 outbox는 복구할 수 없습니다"),
     LLM_MODEL_NOT_CANDIDATE(HttpStatus.NOT_FOUND, "어느 용도의 후보도 아닌 LLM 모델입니다"),

@@ -53,7 +53,6 @@ import tools.jackson.databind.json.JsonMapper
 @SpringBootTest(
     properties = [
         "kachi.ai.events.enabled=true",
-        "kachi.ai.story-summary.events-enabled=true",
         "kachi.ai.story-summary.min-new-articles=3",
         "kachi.ai.outbox.relay.enabled=true",
         "kachi.ai.outbox.relay.initial-delay=1h",

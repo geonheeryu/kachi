@@ -8,9 +8,9 @@ import me.rgunny.kachi.ai.domain.story.StoryId
 class StoryQuarantineNotFoundException(
     storyId: StoryId
 ) : AiException(
-    errorCode = AiQuarantineErrorCode.QUARANTINE_NOT_FOUND,
+    errorCode = AiStoryQuarantineErrorCode.STORY_QUARANTINE_NOT_FOUND,
     message = messageOf(
-        AiQuarantineErrorCode.QUARANTINE_NOT_FOUND,
+        AiStoryQuarantineErrorCode.STORY_QUARANTINE_NOT_FOUND,
         "storyId=${storyId.value}"
     )
 )

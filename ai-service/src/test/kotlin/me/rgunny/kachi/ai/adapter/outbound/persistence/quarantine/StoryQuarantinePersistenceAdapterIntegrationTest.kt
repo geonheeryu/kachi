@@ -2,7 +2,6 @@ package me.rgunny.kachi.ai.adapter.outbound.persistence.quarantine
 
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.ai.adapter.outbound.persistence.PersistenceAdapterIntegrationTest
 import me.rgunny.kachi.ai.domain.quarantine.StoryQuarantineStatus
@@ -67,14 +66,5 @@ class StoryQuarantinePersistenceAdapterIntegrationTest : PersistenceAdapterInteg
 
         assertEquals(StoryQuarantineStatus.QUARANTINED, adapter.findByStoryId(AiTestFixture.STORY_ID)?.status)
         assertEquals(1, outboxes.findAll().size)
-    }
-
-    @Test
-    @DisplayName("outbox 없는 격리 전이는 기록만 저장한다")
-    fun saveQuarantinedWithoutOutbox() = runBlocking {
-        adapter.saveQuarantined(AiTestFixture.storyQuarantine(consecutiveFailures = 3), outbox = null)
-
-        assertEquals(StoryQuarantineStatus.QUARANTINED, adapter.findByStoryId(AiTestFixture.STORY_ID)?.status)
-        assertTrue(outboxes.findAll().isEmpty())
     }
 }

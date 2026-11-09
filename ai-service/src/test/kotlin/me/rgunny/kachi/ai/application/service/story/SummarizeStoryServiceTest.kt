@@ -4,7 +4,6 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.ai.application.exception.LlmProviderException
@@ -38,7 +37,6 @@ class SummarizeStoryServiceTest {
     private val serializer = FakeAiOutboxEventSerializer()
 
     private fun service(
-        eventsEnabled: Boolean = true,
         maxArticlesPerVersion: Int = 50
     ): SummarizeStoryService {
         return SummarizeStoryService(
@@ -48,11 +46,8 @@ class SummarizeStoryServiceTest {
             storyQuarantinePersistencePort = quarantines,
             llmProviderPort = llm,
             eventSerializer = serializer,
-            policy = AiTestFixture.storySummaryPolicy(
-                maxArticlesPerVersion = maxArticlesPerVersion,
-                eventsEnabled = eventsEnabled
-            ),
-            quarantinePolicy = AiTestFixture.quarantinePolicy(),
+            policy = AiTestFixture.storySummaryPolicy(maxArticlesPerVersion = maxArticlesPerVersion),
+            quarantinePolicy = AiTestFixture.storyQuarantinePolicy(),
             clock = AiTestFixture.CLOCK
         )
     }
@@ -171,6 +166,21 @@ class SummarizeStoryServiceTest {
     inner class PublishByKind {
 
         @Test
+        @DisplayName("DEVELOPMENT는 버전과 요약 생성 이벤트 하나를 함께 남긴다")
+        fun developmentPublishesSummaryCreated() {
+            seedStory(pending = 3)
+            store.summaries += AiTestFixture.storySummary(version = 1)
+            markLatestVersion()
+            llm.storyDevelopmentKind = StoryDevelopmentKind.DEVELOPMENT
+
+            val result = summarize() as CreatedStorySummaryResult
+
+            assertTrue(result.published)
+            assertEquals(2, store.summaries.size)
+            assertEquals(AiOutboxEventType.SUMMARY_CREATED, store.outboxes.single().eventType)
+        }
+
+        @Test
         @DisplayName("NO_CHANGE는 버전만 남기고 이벤트를 남기지 않는다")
         fun noChangeSkipsPublish() {
             seedStory(pending = 3)
@@ -196,19 +206,8 @@ class SummarizeStoryServiceTest {
             val result = summarize() as CreatedStorySummaryResult
 
             assertTrue(result.published)
+            assertEquals(2, store.summaries.size)
             assertEquals(AiOutboxEventType.STORY_SPLIT_REQUESTED, store.outboxes.single().eventType)
-        }
-
-        @Test
-        @DisplayName("발행 스위치가 꺼져 있으면 버전만 남기고 이벤트를 남기지 않는다")
-        fun eventsDisabledSkipsPublish() {
-            seedStory(pending = 3)
-
-            val result = summarize(service(eventsEnabled = false)) as CreatedStorySummaryResult
-
-            assertFalse(result.published)
-            assertEquals(1, store.summaries.size)
-            assertTrue(store.outboxes.isEmpty())
         }
 
         private fun markLatestVersion() {
@@ -293,20 +292,21 @@ class SummarizeStoryServiceTest {
             val result = summarize() as FailedStorySummaryResult
 
             assertTrue(result.quarantined)
-            assertEquals(AiOutboxEventType.STORY_QUARANTINED, quarantines.quarantinedOutboxes.single()?.eventType)
+            assertTrue(quarantines.quarantines.getValue(AiTestFixture.STORY_ID).isQuarantined)
+            assertEquals(AiOutboxEventType.STORY_QUARANTINED, quarantines.quarantinedOutboxes.single().eventType)
         }
 
         @Test
-        @DisplayName("발행 스위치가 꺼져 있으면 격리 전이만 저장하고 이벤트는 남기지 않는다")
-        fun quarantineWithoutEventWhenDisabled() {
+        @DisplayName("임계치 전의 실패는 격리 이벤트를 남기지 않는다")
+        fun noQuarantineEventBelowThreshold() {
             seedStory(pending = 3)
-            quarantines.quarantines[AiTestFixture.STORY_ID] = AiTestFixture.storyQuarantine(consecutiveFailures = 2)
+            quarantines.quarantines[AiTestFixture.STORY_ID] = AiTestFixture.storyQuarantine(consecutiveFailures = 1)
             llm.storyFailure = AiTestFixture.llmProviderException(LlmFailureCode.LLM_REQUEST_REJECTED)
 
-            val result = summarize(service(eventsEnabled = false)) as FailedStorySummaryResult
+            val result = summarize() as FailedStorySummaryResult
 
-            assertTrue(result.quarantined)
-            assertNull(quarantines.quarantinedOutboxes.single())
+            assertFalse(result.quarantined)
+            assertTrue(quarantines.quarantinedOutboxes.isEmpty())
         }
 
         @Test

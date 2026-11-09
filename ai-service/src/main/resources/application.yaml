@@ -51,8 +51,6 @@ kachi:
       min-new-articles: 3
       max-wait: 60m
       max-articles-per-version: 50
-      # v2 계약 소비자(routing 전환)가 붙기 전까지 story 경로 이벤트를 outbox에 남기지 않는다.
-      events-enabled: ${KACHI_AI_STORY_EVENTS_ENABLED:false}
     consumer:
       group-id: ai-service
       auto-offset-reset: earliest
@@ -68,7 +66,7 @@ kachi:
         initial-backoff: 1s
         max-backoff: 30s
         multiplier: 2.0
-    quarantine:
+    story-quarantine:
       failure-threshold: 3
     outbox:
       relay:

@@ -53,17 +53,12 @@ class StoryQuarantinePersistenceAdapter(
     /**
      * 격리 기록을 save로, [outbox]를 insert로 한 트랜잭션에 쓴다.
      *
-     * [outbox]가 null이면 격리 기록만 저장한다.
      * 반환값은 넘어온 [quarantine]과 같은 값이다.
      */
     override suspend fun saveQuarantined(
         quarantine: StoryQuarantine,
-        outbox: AiOutbox?
+        outbox: AiOutbox
     ): StoryQuarantine {
-        if (outbox == null) {
-            return save(quarantine)
-        }
-
         transactionalOperator.executeAndAwait {
             mongoTemplate.save(StoryQuarantineMongoDocument.fromDomain(quarantine)).awaitSingle()
             mongoTemplate.insert(AiOutboxMongoDocument.fromDomain(outbox)).awaitSingle()

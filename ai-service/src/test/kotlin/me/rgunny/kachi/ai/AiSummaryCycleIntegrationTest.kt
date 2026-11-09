@@ -65,7 +65,7 @@ import tools.jackson.databind.json.JsonMapper
         "kachi.ai.outbox.relay.enabled=true",
         "kachi.ai.outbox.relay.initial-delay=1h",
         "kachi.ai.scheduler.news-summary.initial-delay=1h",
-        "kachi.ai.quarantine.failure-threshold=2"
+        "kachi.ai.story-quarantine.failure-threshold=2"
     ]
 )
 @Import(AiServiceTestContainersConfig::class)

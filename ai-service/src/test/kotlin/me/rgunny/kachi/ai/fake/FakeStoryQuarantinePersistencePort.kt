@@ -10,12 +10,11 @@ import me.rgunny.kachi.ai.domain.story.StoryId
  * story 격리 기록을 메모리에 두는 fake.
  *
  * [quarantinedOutboxes]는 격리 전이와 함께 남긴 발행 대기 이벤트의 기록이다.
- * null 항목은 이벤트 없이 전이만 저장한 호출이다.
  */
 class FakeStoryQuarantinePersistencePort : StoryQuarantinePersistencePort {
 
     val quarantines = mutableMapOf<StoryId, StoryQuarantine>()
-    val quarantinedOutboxes = mutableListOf<AiOutbox?>()
+    val quarantinedOutboxes = mutableListOf<AiOutbox>()
 
     override suspend fun findByStoryId(storyId: StoryId): StoryQuarantine? = quarantines[storyId]
 
@@ -29,7 +28,7 @@ class FakeStoryQuarantinePersistencePort : StoryQuarantinePersistencePort {
         return quarantine
     }
 
-    override suspend fun saveQuarantined(quarantine: StoryQuarantine, outbox: AiOutbox?): StoryQuarantine {
+    override suspend fun saveQuarantined(quarantine: StoryQuarantine, outbox: AiOutbox): StoryQuarantine {
         quarantines[quarantine.storyId] = quarantine
         quarantinedOutboxes += outbox
 

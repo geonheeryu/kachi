@@ -7,7 +7,6 @@ import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmGenerationMetad
 import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.KeywordQuarantinedEvent
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.SummaryCreatedEvent
-import me.rgunny.kachi.ai.application.service.news.KeywordQuarantinePolicy
 import me.rgunny.kachi.ai.application.service.outbox.AiOutboxRelayPolicy
 import me.rgunny.kachi.ai.config.AiEventsProperties
 import me.rgunny.kachi.ai.config.AiOutboxRelayProperties
@@ -53,6 +52,7 @@ import me.rgunny.kachi.ai.domain.summary.StorySummary
 import me.rgunny.kachi.ai.domain.quarantine.StoryQuarantine
 import me.rgunny.kachi.ai.domain.watermark.SummaryWatermark
 import me.rgunny.kachi.ai.application.port.inbound.story.model.CreatedStorySummaryResult
+import me.rgunny.kachi.ai.application.service.story.StoryQuarantinePolicy
 import me.rgunny.kachi.ai.application.service.story.StorySummaryPolicy
 import me.rgunny.kachi.ai.config.StorySummaryProperties
 import me.rgunny.kachi.ai.domain.summary.StorySummaryId
@@ -506,10 +506,10 @@ object AiTestFixture {
         )
     }
 
-    fun quarantinePolicy(
+    fun storyQuarantinePolicy(
         failureThreshold: Int = DEFAULT_QUARANTINE_FAILURE_THRESHOLD
-    ): KeywordQuarantinePolicy {
-        return KeywordQuarantinePolicy(failureThreshold = failureThreshold)
+    ): StoryQuarantinePolicy {
+        return StoryQuarantinePolicy(failureThreshold = failureThreshold)
     }
 
     fun circuitBreakerProperties(
@@ -585,28 +585,24 @@ object AiTestFixture {
     fun storySummaryPolicy(
         minNewArticles: Int = 3,
         maxWait: Duration = Duration.ofMinutes(60),
-        maxArticlesPerVersion: Int = 50,
-        eventsEnabled: Boolean = true
+        maxArticlesPerVersion: Int = 50
     ): StorySummaryPolicy {
         return StorySummaryPolicy(
             minNewArticles = minNewArticles,
             maxWait = maxWait,
-            maxArticlesPerVersion = maxArticlesPerVersion,
-            eventsEnabled = eventsEnabled
+            maxArticlesPerVersion = maxArticlesPerVersion
         )
     }
 
     fun storySummaryProperties(
         minNewArticles: Int = 3,
         maxWait: Duration = Duration.ofMinutes(60),
-        maxArticlesPerVersion: Int = 50,
-        eventsEnabled: Boolean = true
+        maxArticlesPerVersion: Int = 50
     ): StorySummaryProperties {
         return StorySummaryProperties(
             minNewArticles = minNewArticles,
             maxWait = maxWait,
-            maxArticlesPerVersion = maxArticlesPerVersion,
-            eventsEnabled = eventsEnabled
+            maxArticlesPerVersion = maxArticlesPerVersion
         )
     }
 
