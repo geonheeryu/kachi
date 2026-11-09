@@ -104,23 +104,6 @@ class SubscriptionPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrat
             assertTrue(subscriptionPersistenceAdapter.existsByUserIdAndKeywordId(userId, keyword.id))
             assertEquals(false, subscriptionPersistenceAdapter.existsByUserIdAndKeywordId(UserId.newId(), keyword.id))
         }
-
-        @Test
-        @DisplayName("키워드의 enabled 구독만 조회한다")
-        fun findAllEnabledByKeywordId() {
-            val enabledUser = UserId.newId()
-            val other = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("NVIDIA"), now))
-            subscriptionPersistenceAdapter.save(subscription(enabledUser, setOf(SubscriptionChannel.SLACK)))
-            subscriptionPersistenceAdapter.save(subscription(UserId.newId(), setOf(SubscriptionChannel.SLACK)).disable(now))
-            subscriptionPersistenceAdapter.save(
-                Subscription.create(UserId.newId(), other.id, setOf(SubscriptionChannel.SLACK), now)
-            )
-            flushAndClear()
-
-            val subscriptions = subscriptionPersistenceAdapter.findAllEnabledByKeywordId(keyword.id)
-
-            assertEquals(listOf(enabledUser), subscriptions.map { it.userId })
-        }
     }
 
     @Nested
@@ -132,10 +115,12 @@ class SubscriptionPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrat
         private val allOnes = userId("ffffffff-ffff-7fff-bfff-ffffffffffff")
 
         @Test
-        @DisplayName("enabled 구독 사용자를 user_id 바이트 순으로 읽고 병합 Comparator도 같은 순서를 낸다")
+        @DisplayName("키워드의 enabled 구독 사용자만 user_id 바이트 순으로 읽고 병합 Comparator도 같은 순서를 낸다")
         fun findEnabledUserIdsInByteOrder() {
+            val other = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("NVIDIA"), now))
             saveSubscribers(listOf(allOnes, signedMin, zero, signedMax))
             subscriptionPersistenceAdapter.save(subscription(UserId.newId(), setOf(SubscriptionChannel.SLACK)).disable(now))
+            subscriptionPersistenceAdapter.save(Subscription.create(UserId.newId(), other.id, setOf(SubscriptionChannel.SLACK), now))
             flushAndClear()
 
             val userIds = subscriptionPersistenceAdapter.findEnabledUserIdsByKeywordId(keyword.id, cursor = null, limit = 10)

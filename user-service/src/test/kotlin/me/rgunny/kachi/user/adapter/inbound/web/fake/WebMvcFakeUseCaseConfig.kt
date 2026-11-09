@@ -46,9 +46,6 @@ class WebMvcFakeUseCaseConfig {
     fun listChannelBindingsUseCase(): FakeListChannelBindingsUseCase = FakeListChannelBindingsUseCase()
 
     @Bean
-    fun findSubscribersUseCase(): FakeFindSubscribersUseCase = FakeFindSubscribersUseCase()
-
-    @Bean
     fun findSubscriptionRecipientsUseCase(): FakeFindSubscriptionRecipientsUseCase = FakeFindSubscriptionRecipientsUseCase()
 
     @Bean

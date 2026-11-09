@@ -28,11 +28,6 @@ class SubscriptionPersistenceAdapter(
             .map { it.toDomain() }
     }
 
-    override fun findAllEnabledByKeywordId(keywordId: KeywordId): List<Subscription> {
-        return subscriptionJpaRepository.findAllByKeywordIdAndEnabledTrue(keywordId.value)
-            .map { it.toDomain() }
-    }
-
     override fun findEnabledUserIdsByKeywordId(keywordId: KeywordId, cursor: UserId?, limit: Int): List<UserId> {
         val userIds = if (cursor == null) {
             subscriptionJpaRepository.findEnabledUserIdsByKeywordId(keywordId.value, Limit.of(limit))

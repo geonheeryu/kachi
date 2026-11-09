@@ -26,10 +26,6 @@ class FakeSubscriptionPersistencePort(
 
     override fun findAllByUserId(userId: UserId): List<Subscription> = subscriptions.values.filter { it.userId == userId }
 
-    override fun findAllEnabledByKeywordId(keywordId: KeywordId): List<Subscription> {
-        return subscriptions.values.filter { it.keywordId == keywordId && it.enabled }
-    }
-
     override fun findEnabledUserIdsByKeywordId(keywordId: KeywordId, cursor: UserId?, limit: Int): List<UserId> {
         return subscriptions.values
             .filter { it.keywordId == keywordId && it.enabled }

@@ -118,11 +118,11 @@ class SecurityConfigTest @Autowired constructor(
         }
 
         @Test
-        @DisplayName("구독 조회 internal API는 인증 없이 접근할 수 있다")
-        fun permitSubscriptionsInternalApi() {
-            mockMvc.get("/api/v1/internal/subscriptions") {
-                param("keyword", "tesla")
-                accept = MediaType.APPLICATION_JSON
+        @DisplayName("구독 수신자 조회 internal API는 인증 없이 접근할 수 있다")
+        fun permitSubscriptionRecipientsInternalApi() {
+            mockMvc.post("/api/v1/internal/subscriptions/recipients/search") {
+                contentType = MediaType.APPLICATION_JSON
+                content = subscriptionRecipientsSearchBody()
             }.andExpect {
                 status { isOk() }
             }
@@ -396,6 +396,15 @@ class SecurityConfigTest @Autowired constructor(
         return """
             {
               "webhookUrl": "https://hooks.slack.com/services/T000/B000/XXXX"
+            }
+        """.trimIndent()
+    }
+
+    private fun subscriptionRecipientsSearchBody(): String {
+        return """
+            {
+              "keywords": ["tesla"],
+              "cursor": null
             }
         """.trimIndent()
     }
