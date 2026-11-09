@@ -1,5 +1,6 @@
 package me.rgunny.kachi.notification.service.architecture
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
@@ -42,6 +43,13 @@ class ArchitectureTest {
             .that().resideInAPackage("..service.adapter.inbound..")
             .should().dependOnClassesThat()
             .resideInAPackage("..service.adapter.outbound..")
+
+        @ArchTest
+        @JvmField
+        val inbound_adapters_do_not_implement_outbound_ports: ArchRule = noClasses()
+            .that().resideInAPackage("..service.adapter.inbound..")
+            .should().implement(JavaClass.Predicates.resideInAPackage("..notification.application.port.outbound.."))
+            .allowEmptyShould(true)
 
         @ArchTest
         @JvmField

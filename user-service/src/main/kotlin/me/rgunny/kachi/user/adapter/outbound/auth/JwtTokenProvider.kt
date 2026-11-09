@@ -1,4 +1,4 @@
-package me.rgunny.kachi.user.adapter.inbound.web.security
+package me.rgunny.kachi.user.adapter.outbound.auth
 
 import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts

@@ -1,5 +1,6 @@
 package me.rgunny.kachi.ai.architecture
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.junit.AnalyzeClasses
 import com.tngtech.archunit.junit.ArchTest
@@ -69,6 +70,13 @@ class ArchitectureTest {
             .that().resideInAPackage("..adapter.inbound..")
             .should().dependOnClassesThat()
             .resideInAPackage("..adapter.outbound..")
+            .allowEmptyShould(true)
+
+        @ArchTest
+        @JvmField
+        val inbound_adapters_do_not_implement_outbound_ports: ArchRule = noClasses()
+            .that().resideInAPackage("..adapter.inbound..")
+            .should().implement(JavaClass.Predicates.resideInAPackage("..application.port.outbound.."))
             .allowEmptyShould(true)
 
         @ArchTest

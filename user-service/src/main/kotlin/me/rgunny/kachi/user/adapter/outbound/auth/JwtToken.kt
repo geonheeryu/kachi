@@ -1,4 +1,4 @@
-package me.rgunny.kachi.user.adapter.inbound.web.security
+package me.rgunny.kachi.user.adapter.outbound.auth
 
 import java.time.Instant
 

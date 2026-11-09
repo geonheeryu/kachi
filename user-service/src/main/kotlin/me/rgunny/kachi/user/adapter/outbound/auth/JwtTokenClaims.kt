@@ -1,4 +1,4 @@
-package me.rgunny.kachi.user.adapter.inbound.web.security
+package me.rgunny.kachi.user.adapter.outbound.auth
 
 import me.rgunny.kachi.user.domain.UserId
 import me.rgunny.kachi.user.domain.UserRole
