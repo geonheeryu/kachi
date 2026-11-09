@@ -10,7 +10,7 @@ stdin으로 Claude Code 훅 JSON(tool_name, tool_input, cwd)을 받는다.
 러너 세션(HARNESS_HEADLESS=1)에서만 차단:
   - git commit, git push                     세션은 커밋하지 않고 러너가 커밋한다
   - phase scope 밖 파일 편집(저장소 밖 포함)
-감독 세션의 commit·push는 훅이 아니라 .claude/settings.json의 permissions.ask가 사용자에게 묻는다(AGENTS.md).
+감독 세션의 push는 훅이 아니라 .claude/settings.json의 permissions.ask가 사용자에게 묻는다(AGENTS.md).
 Bash의 리다이렉트·sed -i 쓰기는 보지 않는다. 그 백스톱은 러너의 사후 검사다.
 """
 
