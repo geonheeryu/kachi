@@ -4,7 +4,6 @@ import me.rgunny.kachi.collector.fixture.CollectorTestFixture
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -68,35 +67,5 @@ class NewsTest {
             collectedAt = collectedAt,
             matchedKeywords = matchedKeywords
         )
-    }
-
-    @Nested
-    @DisplayName("restore()")
-    inner class Restore {
-
-        @Test
-        @DisplayName("뉴스를 저장된 상태로 복원한다")
-        fun restoreNews() {
-            val id = NewsId.of(UUID.randomUUID())
-
-            val news = News.restore(
-                id = id,
-                source = NewsSource.NAVER,
-                title = title,
-                excerpt = excerpt,
-                url = url,
-                urlHash = "url-hash",
-                language = language,
-                publishedAt = publishedAt,
-                collectedAt = collectedAt,
-                matchedKeywords = listOf(keyword)
-            )
-
-            assertEquals(id, news.id)
-            assertEquals(NewsSource.NAVER, news.source)
-            assertEquals(excerpt, news.excerpt)
-            assertEquals("url-hash", news.urlHash)
-            assertEquals(language, news.language)
-        }
     }
 }

@@ -48,31 +48,5 @@ class News private constructor(
                 matchedKeywords = matchedKeywords.distinct()
             )
         }
-
-        fun restore(
-            id: NewsId,
-            source: NewsSource,
-            title: NewsTitle,
-            excerpt: NewsExcerpt,
-            url: NewsUrl,
-            urlHash: String,
-            language: NewsLanguage,
-            publishedAt: Instant,
-            collectedAt: Instant,
-            matchedKeywords: List<CollectedKeyword>
-        ): News {
-            return News(
-                id = id,
-                source = source,
-                title = title,
-                excerpt = excerpt,
-                url = url,
-                urlHash = urlHash,
-                language = language,
-                publishedAt = publishedAt,
-                collectedAt = collectedAt,
-                matchedKeywords = matchedKeywords
-            )
-        }
     }
 }
