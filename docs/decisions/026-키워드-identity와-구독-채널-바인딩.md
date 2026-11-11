@@ -147,15 +147,15 @@ internal API는 인증을 두지 않고 `/api/v1/internal/**`를 `permitAll`로 
 
 최악은 `limit` 100, `keywords` 100개이고, 모든 사용자가 100개 키워드를 세 채널(`SLACK`, `DISCORD`, `TELEGRAM`)로 모두 구독한 경우다. `canonical_key`·`display_name`은 `varchar(100)`이고 코드(`CanonicalKey`, `KeywordName`)도 100자(UTF-16 code unit)를 넘으면 거부한다. 제어 문자는 JSON에서 `\u0001`처럼 6바이트로 이스케이프되므로 문자열 하나는 최대 600바이트다.
 
-```
-keywords 항목    {"canonicalKey":"..","displayName":".."}           36 + 600 x 2                       =   1,236
-keywords 배열    1,236 x 100 + 쉼표 99 + 괄호 2                                                         = 123,701
-keywordIndexes   [0,1,..,99]                                         괄호 2 + 숫자 190 + 쉼표 99          =     291
-recipients 항목  {"userId":"<UUID 36>","channel":"..","keywordIndexes":[..]}   371 + 채널 이름 5·7·8      = 376·378·379
-recipients 배열  (376 + 378 + 379) x 100 + 쉼표 299 + 괄호 2                                            = 113,601
-래핑             {"success":true,"data":{..,"nextCursor":"<UUID 36>"},"error":null}                     =     116
-합계                                                                                                    = 237,418
-```
+| 항목 | 형태 | 계산 | 바이트 |
+| --- | --- | --- | --- |
+| `keywords` 항목 | `{"canonicalKey":"..","displayName":".."}` | 36 + 600 x 2 | 1,236 |
+| `keywords` 배열 | 항목 100개 | 1,236 x 100 + 쉼표 99 + 괄호 2 | 123,701 |
+| `keywordIndexes` | `[0,1,..,99]` | 괄호 2 + 숫자 190 + 쉼표 99 | 291 |
+| `recipients` 항목 | `{"userId":"<UUID 36>","channel":"..","keywordIndexes":[..]}` | 371 + 채널 이름 5·7·8 | 376·378·379 |
+| `recipients` 배열 | 사용자 100명 x 채널 3개 | (376 + 378 + 379) x 100 + 쉼표 299 + 괄호 2 | 113,601 |
+| 래핑 | `{"success":true,"data":{..,"nextCursor":"<UUID 36>"},"error":null}` | | 116 |
+| 합계 | | 123,701 + 113,601 + 116 | 237,418 |
 
 237,418바이트는 notification-routing의 `max-in-memory-size` 262,144바이트의 90.6%이고, 24,726바이트가 남는다.
 
