@@ -11,7 +11,6 @@
 | 3 | TEI·Qdrant 컨테이너 첫 기동 | 머신마다 한 번 |
 | 4 | LLM 실호출 검증 계정 | 과금 계정을 쓸 때 |
 | 5 | 전체 사이클 스모크의 수신 확인 | 사이클 구성이 바뀔 때 |
-| 6 | 저장 형식이 바뀐 뒤의 로컬 데이터 초기화 | 저장 형식이 바뀔 때 |
 
 ## 1. `.env`·`.env.<profile>`의 실제 값
 
@@ -49,18 +48,3 @@ story-service의 `realTest`와 전체 사이클 스모크가 이 컨테이너를
 - [ ] `docs/전체-사이클-스모크.md`의 확인 절차대로 Slack, Discord, Telegram에 알림이 도착했는지 사람이 확인한다.
 
 에이전트는 발송 로그까지만 확인할 수 있고, 실제 채널에 도착했는지는 사람이 화면으로 확인한다.
-
-## 6. 저장 형식이 바뀐 뒤의 로컬 데이터 초기화
-
-- [ ] 저장 형식이 바뀐 코드로 처음 기동하기 전에 로컬 Mongo의 `kachi_ai`, `kachi_notification`, `kachi_notification_routing` 데이터베이스를 지운다.
-- [ ] 같은 때에 Kafka의 `ai.*`, `notification.*` topic을 지운다.
-
-ai의 실행 기록, routing job, 알림 출처는 옛 문서를 읽는 이행 코드가 없다. 옛 데이터와 옛 schemaVersion 레코드가 남으면 복원이나 소비에서 실패하며, 근거는 ADR 035의 운영 제약이다.
-로컬 데이터를 지우는 일이라 사람이 실행 여부를 정한다. 사용자·구독·바인딩(MySQL)과 collector·story-service의 Mongo는 지우지 않는다.
-
-```sh
-docker exec kachi-mongo mongosh --quiet --eval \
-  'for (const name of ["kachi_ai", "kachi_notification", "kachi_notification_routing"]) { db.getSiblingDB(name).dropDatabase() }'
-docker exec kachi-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
-  --delete --topic 'ai\..*|notification\..*'
-```

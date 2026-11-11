@@ -44,12 +44,14 @@ FOLLOWERS=(collector-service story-service ai-service notification-routing notif
 
 usage() {
   cat <<'USAGE'
-Usage: ./scripts/cycle.sh <start|stop|status>
+Usage: ./scripts/cycle.sh <start|stop|status|reset>
 
   start   TEI(tei-embedding tei-reranker) -> 인프라(mysql redis mongo kafka qdrant) -> Mongo index
           -> user-service -> 나머지 6개 순으로 띄운다.
   stop    서비스 7개를 내리고 인프라와 TEI를 내린다.
   status  서비스, 인프라, TEI 상태를 본다.
+  reset   서비스 7개를 내리고 mysql·redis·mongo·kafka·qdrant의 컨테이너와 데이터 volume을 지운다.
+          TEI 가중치(kachi_tei-data)와 observability는 남는다. 다음 start가 스키마·시드·인덱스·컬렉션·topic을 다시 만든다.
 
   TEI는 첫 기동에 모델 가중치를 내려받는다. volume kachi_tei-data가 없으면 TEI를 띄우지 않고 실패한다.
   첫 기동은 './scripts/infra.sh tei start'로 따로 한다(docs/user-intervention.md 3번).
@@ -136,12 +138,23 @@ create_mongo_indexes() {
   done
 }
 
+# app.sh는 서비스마다 gradlew bootRun을 따로 띄운다. 공유 모듈(ai-contract 등)을 두 빌드가 같은 시각에 컴파일하면 build 디렉터리에서 충돌하므로 먼저 한 번 컴파일한다.
+compile_all() {
+  if "$ROOT/gradlew" --quiet classes; then
+    echo "classes compiled."
+  else
+    echo "compile failed. run './gradlew classes' to see the error." >&2
+    return 1
+  fi
+}
+
 start() {
   wait_for_tei || return 1
   "$INFRA" core start || return 1
   "$INFRA" qdrant start || return 1
   wait_for_kafka || return 1
   create_mongo_indexes || return 1
+  compile_all || return 1
 
   "$APP" user-service start
   wait_for_health "$USER_SERVICE_URL" user-service || return 1
@@ -175,10 +188,19 @@ status() {
   "$INFRA" tei status
 }
 
+# 사이클의 데이터는 전부 기동 시 다시 만들어진다. MySQL 스키마와 시드(Flyway, local 프로파일 시드), Mongo 인덱스(start), Qdrant 컬렉션(story-service 기동),
+# Kafka topic(자동 생성). 저장 형식이 바뀐 코드로 처음 띄우기 전이나 처음부터 다시 돌릴 때 쓴다.
+reset() {
+  "$APP" all stop
+  "$INFRA" core reset || return 1
+  "$INFRA" qdrant reset || return 1
+}
+
 [[ $# -eq 1 ]] || { usage; exit 1; }
 case "$1" in
   start) start ;;
   stop) stop ;;
   status) status ;;
+  reset) reset ;;
   *) usage; exit 1 ;;
 esac

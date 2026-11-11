@@ -167,4 +167,4 @@ story 요약 저장과 outbox 행 기록은 항상 한 트랜잭션이다.
 
 - DLT 메시지의 재처리는 원 topic 재발행이다. job이 STARTED면 저장된 커서부터, COMPLETED면 SKIPPED다.
 - story의 keywords가 100개를 넘는 요약은 재시도 없이 DLT로 간다. 수신자 조회의 요청 한도가 100개이고(ADR 026), 나눠 조회하면 수신자별 본문과 한 통 규칙이 깨진다.
-- schemaVersion 1 레코드와 `ai.keyword.quarantined`의 레코드는 이행하지 않는다. 남은 로컬 데이터는 사람이 지운다(`docs/user-intervention.md` 6번).
+- schemaVersion 1 레코드와 `ai.keyword.quarantined`의 레코드는 이행하지 않는다. 옛 데이터는 `./scripts/cycle.sh reset`으로 지우고 기동 시 다시 만든다.
