@@ -7,6 +7,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import me.rgunny.kachi.user.adapter.outbound.persistence.PersistenceAdapterIntegrationTest
 import me.rgunny.kachi.user.adapter.outbound.persistence.keyword.KeywordPersistenceAdapter
+import me.rgunny.kachi.user.application.service.UserIdByteOrder
 import me.rgunny.kachi.user.domain.Keyword
 import me.rgunny.kachi.user.domain.KeywordName
 import me.rgunny.kachi.user.domain.Subscription
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import java.util.UUID
 
 @DisplayName("SubscriptionPersistenceAdapter 통합 테스트")
 class SubscriptionPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTest() {
@@ -119,6 +121,70 @@ class SubscriptionPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrat
 
             assertEquals(listOf(enabledUser), subscriptions.map { it.userId })
         }
+    }
+
+    @Nested
+    @DisplayName("수신자 페이지 조회")
+    inner class RecipientPage {
+        private val zero = userId("00000000-0000-7000-8000-000000000000")
+        private val signedMax = userId("7fffffff-ffff-7fff-bfff-ffffffffffff")
+        private val signedMin = userId("80000000-0000-7000-8000-000000000000")
+        private val allOnes = userId("ffffffff-ffff-7fff-bfff-ffffffffffff")
+
+        @Test
+        @DisplayName("enabled 구독 사용자를 user_id 바이트 순으로 읽고 병합 Comparator도 같은 순서를 낸다")
+        fun findEnabledUserIdsInByteOrder() {
+            saveSubscribers(listOf(allOnes, signedMin, zero, signedMax))
+            subscriptionPersistenceAdapter.save(subscription(UserId.newId(), setOf(SubscriptionChannel.SLACK)).disable(now))
+            flushAndClear()
+
+            val userIds = subscriptionPersistenceAdapter.findEnabledUserIdsByKeywordId(keyword.id, cursor = null, limit = 10)
+
+            assertEquals(listOf(zero, signedMax, signedMin, allOnes), userIds)
+            assertEquals(userIds, userIds.shuffled().sortedWith(UserIdByteOrder))
+        }
+
+        @Test
+        @DisplayName("커서 다음부터 limit명만 읽는다")
+        fun findEnabledUserIdsAfterCursor() {
+            saveSubscribers(listOf(allOnes, signedMin, zero, signedMax))
+            flushAndClear()
+
+            val userIds = subscriptionPersistenceAdapter.findEnabledUserIdsByKeywordId(keyword.id, cursor = signedMax, limit = 1)
+
+            assertEquals(listOf(signedMin), userIds)
+        }
+
+        @Test
+        @DisplayName("키워드 여럿 x 사용자 여럿의 enabled 구독을 채널까지 읽는다")
+        fun findAllEnabledByKeywordIdsAndUserIds() {
+            val other = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("NVIDIA"), now))
+            val unrelated = keywordPersistenceAdapter.save(Keyword.create(KeywordName.of("TSMC"), now))
+            val channels = setOf(SubscriptionChannel.SLACK, SubscriptionChannel.DISCORD)
+            subscriptionPersistenceAdapter.save(subscription(zero, channels))
+            subscriptionPersistenceAdapter.save(Subscription.create(zero, other.id, setOf(SubscriptionChannel.TELEGRAM), now))
+            subscriptionPersistenceAdapter.save(Subscription.create(zero, unrelated.id, setOf(SubscriptionChannel.SLACK), now))
+            subscriptionPersistenceAdapter.save(Subscription.create(signedMin, other.id, setOf(SubscriptionChannel.SLACK), now).disable(now))
+            subscriptionPersistenceAdapter.save(subscription(allOnes, channels))
+            flushAndClear()
+
+            val subscriptions = subscriptionPersistenceAdapter.findAllEnabledByKeywordIdsAndUserIds(
+                keywordIds = setOf(keyword.id, other.id),
+                userIds = setOf(zero, signedMin)
+            )
+
+            assertEquals(
+                setOf(Triple(zero, keyword.id, channels), Triple(zero, other.id, setOf(SubscriptionChannel.TELEGRAM))),
+                subscriptions.map { Triple(it.userId, it.keywordId, it.channels) }.toSet()
+            )
+            assertEquals(2, subscriptions.size)
+        }
+
+        private fun saveSubscribers(userIds: List<UserId>) {
+            userIds.forEach { subscriptionPersistenceAdapter.save(subscription(it, setOf(SubscriptionChannel.SLACK))) }
+        }
+
+        private fun userId(value: String): UserId = UserId.of(UUID.fromString(value))
     }
 
     private fun subscription(userId: UserId, channels: Set<SubscriptionChannel>): Subscription {

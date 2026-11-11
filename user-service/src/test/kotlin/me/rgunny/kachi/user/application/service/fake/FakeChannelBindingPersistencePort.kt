@@ -1,6 +1,7 @@
 package me.rgunny.kachi.user.application.service.fake
 
 import me.rgunny.kachi.user.application.port.outbound.binding.ChannelBindingPersistencePort
+import me.rgunny.kachi.user.application.port.outbound.binding.model.ActiveChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBinding
 import me.rgunny.kachi.user.domain.ChannelBindingId
 import me.rgunny.kachi.user.domain.LinkTokenHash
@@ -27,6 +28,12 @@ class FakeChannelBindingPersistencePort(
     override fun findAllByUserId(userId: UserId): List<ChannelBinding> = bindings.values.filter { it.userId == userId }
 
     override fun findAllByUserIds(userIds: Set<UserId>): List<ChannelBinding> = bindings.values.filter { it.userId in userIds }
+
+    override fun findAllActiveByUserIds(userIds: Set<UserId>): List<ActiveChannelBinding> {
+        return bindings.values
+            .filter { it.userId in userIds && it.isActive }
+            .map { ActiveChannelBinding(userId = it.userId, channel = it.channel) }
+    }
 
     override fun findByLinkTokenHash(linkTokenHash: LinkTokenHash): ChannelBinding? {
         return bindings.values.singleOrNull { it.linkTokenHash == linkTokenHash }

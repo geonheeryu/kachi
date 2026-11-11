@@ -16,6 +16,9 @@ interface KeywordPersistencePort {
 
     fun findByCanonicalKey(canonicalKey: CanonicalKey): Keyword?
 
+    /** [canonicalKeys] 중 존재하는 키워드. 순서는 정하지 않는다. */
+    fun findAllByCanonicalKeys(canonicalKeys: Set<CanonicalKey>): List<Keyword>
+
     /** enabled 구독이 하나 이상 있는 키워드 */
     fun findAllWithEnabledSubscription(): List<Keyword>
 
