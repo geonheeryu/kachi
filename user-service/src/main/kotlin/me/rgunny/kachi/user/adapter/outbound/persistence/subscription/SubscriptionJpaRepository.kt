@@ -9,15 +9,14 @@ import org.springframework.data.repository.query.Param
 /**
  * `subscriptions` 테이블 Spring Data 저장소.
  *
- * 사용자 기준 목록, 키워드 기준 enabled 목록, (user, keyword) 존재 여부를 제공한다. 채널 컬렉션은 엔티티가 함께 적재한다.
+ * 사용자 기준 목록, 키워드 기준 enabled 사용자 keyset 조회, (user, keyword) 존재 여부를 제공한다.
+ * 채널 컬렉션은 엔티티가 함께 적재한다.
  *
  * userId keyset 조회는 `(keyword_id, enabled, user_id)` 인덱스를 user_id 순으로 읽고 [Limit]에서 멈춘다.
  * user_id 비교와 정렬은 `BINARY(16)`의 부호 없는 바이트 순이다.
  */
 interface SubscriptionJpaRepository : JpaRepository<SubscriptionJpaEntity, UUID> {
     fun findAllByUserId(userId: UUID): List<SubscriptionJpaEntity>
-
-    fun findAllByKeywordIdAndEnabledTrue(keywordId: UUID): List<SubscriptionJpaEntity>
 
     @Query(
         """

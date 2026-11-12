@@ -22,7 +22,6 @@ import me.rgunny.kachi.collector.fixture.CollectorTestFixture
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.time.Instant
 import kotlin.test.assertEquals
 
 @DisplayName("CollectNewsService")
@@ -242,15 +241,6 @@ class CollectNewsServiceTest {
                 }
                 .map { it.second }
                 .toSet()
-        }
-
-        override suspend fun findByKeyword(
-            keyword: CollectedKeyword,
-            from: Instant?,
-            to: Instant?,
-            limit: Int
-        ): List<News> {
-            return savedNews.filter { keyword in it.matchedKeywords }.take(limit)
         }
 
         val savedOutboxes: MutableList<CollectorOutbox> = mutableListOf()

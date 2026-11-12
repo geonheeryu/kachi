@@ -210,25 +210,7 @@ GET /api/v1/internal/keywords/active
 enabled 구독이 하나 이상인 canonical 키워드를 `canonicalKey` 순으로 돌려준다. `name`은 `canonicalKey`와 같은 값이다 —
 소비자는 `name`만 읽고 그 문자열로 수집·요약·라우팅을 이어가므로 정규화는 이 서비스 한 곳에서만 한다.
 
-키워드 수신자 조회 — notification-routing이 요약 이벤트의 키워드로 호출한다:
-
-```http
-GET /api/v1/internal/subscriptions?keyword=space-x
-```
-
-```json
-{
-  "success": true,
-  "data": [{ "userId": "…", "channel": "SLACK" }],
-  "error": null
-}
-```
-
-`keyword`는 다시 정규화해 찾으므로 활성 키워드 API의 `name`을 그대로 보내면 되고 원문이 와도 같은 결과다.
-enabled 구독의 채널 중 바인딩이 `ACTIVE`인 것만 `userId`, `channel` 순으로 돌려주고, 없는 키워드는 빈 배열이다.
-`userId`가 수신자 식별자(recipientId)이며 주소는 싣지 않는다. `(userId, channel)`이 바인딩 하나를 확정한다.
-
-구독 수신자 조회. 여러 키워드의 수신자를 사용자 단위 페이지로 돌려준다:
+구독 수신자 조회 — notification-routing이 여러 키워드의 수신자를 사용자 단위 페이지로 물을 때 호출한다:
 
 ```http
 POST /api/v1/internal/subscriptions/recipients/search
@@ -254,6 +236,7 @@ POST /api/v1/internal/subscriptions/recipients/search
 없는 키워드만 주면 `keywords`·`recipients`가 빈 배열이고 `nextCursor`는 `null`이다.
 
 수신자 항목은 `(userId, channel)` 하나이고 `userId`, `channel` 순으로 담는다.
+`userId`가 수신자 식별자(recipientId)이며 주소는 싣지 않는다.
 enabled 구독의 채널 중 그 사용자의 `ACTIVE` 바인딩이 있는 채널만 항목이 된다.
 `keywordIndexes`는 그 채널로 구독한 키워드의 `keywords` 배열 위치를 오름차순으로 가리킨다.
 

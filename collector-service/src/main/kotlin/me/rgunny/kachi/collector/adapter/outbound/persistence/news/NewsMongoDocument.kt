@@ -2,17 +2,10 @@ package me.rgunny.kachi.collector.adapter.outbound.persistence.news
 
 import java.time.Instant
 import java.util.UUID
-import me.rgunny.kachi.collector.domain.CollectedKeyword
 import me.rgunny.kachi.collector.domain.News
-import me.rgunny.kachi.collector.domain.NewsExcerpt
-import me.rgunny.kachi.collector.domain.NewsId
-import me.rgunny.kachi.collector.domain.NewsLanguage
 import me.rgunny.kachi.collector.domain.NewsSource
-import me.rgunny.kachi.collector.domain.NewsTitle
-import me.rgunny.kachi.collector.domain.NewsUrl
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.index.CompoundIndex
-import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 
 /**
@@ -34,25 +27,9 @@ data class NewsMongoDocument(
     val urlHash: String,
     val language: String,
     val publishedAt: Instant,
-    @Indexed
     val collectedAt: Instant,
     val matchedKeywords: List<String>
 ) {
-    fun toDomain(): News {
-        return News.restore(
-            id = NewsId.of(id),
-            source = source,
-            title = NewsTitle.of(title),
-            excerpt = NewsExcerpt.of(excerpt),
-            url = NewsUrl.of(url),
-            urlHash = urlHash,
-            language = NewsLanguage.of(language),
-            publishedAt = publishedAt,
-            collectedAt = collectedAt,
-            matchedKeywords = matchedKeywords.map { CollectedKeyword.of(it) }
-        )
-    }
-
     companion object {
         fun fromDomain(news: News): NewsMongoDocument {
             return NewsMongoDocument(

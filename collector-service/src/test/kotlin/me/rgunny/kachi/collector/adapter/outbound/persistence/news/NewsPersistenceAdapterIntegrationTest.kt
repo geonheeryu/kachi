@@ -1,8 +1,8 @@
 package me.rgunny.kachi.collector.adapter.outbound.persistence.news
 
 import java.time.Duration
-import java.time.Instant
 import kotlin.test.assertEquals
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.runBlocking
 import me.rgunny.kachi.collector.adapter.outbound.persistence.PersistenceAdapterIntegrationTest
 import me.rgunny.kachi.collector.application.port.outbound.news.model.SaveNewsResult
@@ -41,10 +41,6 @@ class NewsPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTest(
     private val publishedAt = collectedAt.minus(Duration.ofHours(14))
     private val keyword = CollectedKeyword.of("NVIDIA")
 
-    // 조회 구간 경계를 그대로 쓰는 뉴스가 있어야 from/to 포함 여부를 검증할 수 있다.
-    private val windowFrom = collectedAt.plus(Duration.ofDays(4))
-    private val windowTo = windowFrom.plus(Duration.ofDays(1))
-
     private val outboxCollection by lazy { CollectorOutboxCollection(mongoTemplate) }
 
     @BeforeEach
@@ -79,9 +75,9 @@ class NewsPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTest(
 
             adapter.save(news, outboxFor(news))
 
-            val found = adapter.findByKeyword(keyword = keyword, from = null, to = null, limit = 1).single()
-            assertEquals(news.excerpt, found.excerpt)
-            assertEquals(news.language, found.language)
+            val found = repository.findById(news.id.value).awaitSingle()
+            assertEquals(news.excerpt.value, found.excerpt)
+            assertEquals(news.language.value, found.language)
         }
 
         @Test
@@ -154,71 +150,15 @@ class NewsPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTest(
         }
     }
 
-    @Nested
-    @DisplayName("findByKeyword()")
-    inner class FindByKeyword {
-
-        @Test
-        @DisplayName("키워드가 매칭된 뉴스를 수집 시각 내림차순으로 조회한다")
-        fun findByKeyword() = runBlocking {
-            val older = news(
-                url = "https://kachi.com/news/1",
-                title = "NVIDIA 이전 뉴스",
-                collectedAt = windowFrom
-            )
-            val newer = news(
-                url = "https://kachi.com/news/2",
-                title = "NVIDIA 최신 뉴스",
-                collectedAt = windowTo
-            )
-            val otherKeyword = news(
-                url = "https://kachi.com/news/3",
-                title = "TESLA 뉴스",
-                keyword = CollectedKeyword.of("TESLA"),
-                collectedAt = windowTo.plus(Duration.ofHours(1))
-            )
-            adapter.save(older, outboxFor(older))
-            adapter.save(newer, outboxFor(newer))
-            adapter.save(otherKeyword, outboxFor(otherKeyword))
-
-            val found = adapter.findByKeyword(
-                keyword = keyword,
-                from = windowFrom,
-                to = windowTo,
-                limit = 20
-            )
-
-            assertEquals(listOf("NVIDIA 최신 뉴스", "NVIDIA 이전 뉴스"), found.map { it.title.value })
-        }
-
-        @Test
-        @DisplayName("limit만큼만 조회한다")
-        fun limitResults() = runBlocking {
-            news(url = "https://kachi.com/news/1").let { adapter.save(it, outboxFor(it)) }
-            news(url = "https://kachi.com/news/2").let { adapter.save(it, outboxFor(it)) }
-
-            val found = adapter.findByKeyword(
-                keyword = keyword,
-                from = null,
-                to = null,
-                limit = 1
-            )
-
-            assertEquals(1, found.size)
-        }
-    }
-
     private fun outboxFor(news: News): CollectorOutbox {
         return NewsCollectedEvent.from(news).toOutbox(payload = "{}", now = CollectorTestFixture.NOW)
     }
 
     private fun news(
         url: String,
-        source: NewsSource = NewsSource.GOOGLE,
-        title: String = "NVIDIA 뉴스",
-        keyword: CollectedKeyword = this.keyword,
-        collectedAt: Instant = this.collectedAt
+        source: NewsSource = NewsSource.GOOGLE
     ): News {
+        val title = "NVIDIA 뉴스"
         return News.create(
             source = source,
             title = NewsTitle.of(title),

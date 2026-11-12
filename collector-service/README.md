@@ -128,37 +128,6 @@ POST /api/v1/internal/collections/news
 
 이미 수집이 실행 중이면 `409 CONFLICT`, 실행 lock을 확인할 수 없으면 `503 SERVICE_UNAVAILABLE`을 반환한다.
 
-저장 뉴스 조회:
-
-```http
-GET /api/v1/internal/news?keyword=NVIDIA&from=2026-06-01T00:00:00Z&to=2026-06-02T00:00:00Z&limit=20
-```
-
-이 API는 `ai-service`가 요약 대상 뉴스를 읽기 위한 내부 계약이다.
-`keyword`는 필수이고, `from`, `to`, `limit`은 선택값이다. `limit`은 1 이상 100 이하이고 생략하면 20이다.
-`excerpt`는 provider가 준 발췌문이고 `language`는 기사 언어다. Google은 설정 `language-code`의 값이고 Naver는 `ko`, Finnhub은 `en`으로 고정이다.
-모든 필드가 항상 있다. 제목·발췌문·URL·발행 시각 중 하나라도 없는 provider item은 수집 시점에 제외된다.
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "018f...",
-      "source": "NAVER",
-      "title": "NVIDIA ...",
-      "excerpt": "엔비디아가 ...",
-      "url": "https://n.news.naver.com/...",
-      "language": "ko",
-      "publishedAt": "2026-06-01T10:00:00Z",
-      "collectedAt": "2026-06-01T10:05:00Z",
-      "matchedKeywords": ["NVIDIA"]
-    }
-  ],
-  "error": null
-}
-```
-
 outbox 조회와 복구:
 
 ```http
@@ -179,7 +148,9 @@ outbox 행 하나가 레코드 하나다. key는 기사 id, value는 기록 시�
 | --- | --- | --- |
 | `NEWS_COLLECTED` | `collector.news.collected` | `CollectorNewsCollectedEvent` |
 
-이벤트는 제목·발췌문·URL·출처·언어·시각·매칭 키워드를 다 싣는다. 소비자는 이 값만으로 처리하고 collector의 저장소나 조회 API를 부르지 않는다.
+이벤트는 제목·발췌문·URL·출처·언어·시각·매칭 키워드를 다 싣는다. 소비자는 이 값만으로 처리하고 collector의 저장소를 읽지 않는다.
+발췌문은 provider가 준 값이고 언어는 기사 언어다. Google은 설정 `language-code`의 값이고 Naver는 `ko`, Finnhub은 `en`으로 고정이다.
+모든 필드가 항상 있다. 제목·발췌문·URL·발행 시각 중 하나라도 없는 provider item은 수집 시점에 제외된다.
 topic은 기사 id compaction과 `kachi.collector.events.retention`(기본 30일) 삭제를 함께 건다. 기사는 저장 후 바뀌지 않으므로 그 기간 안에서는 처음부터 다시 읽어 재처리할 수 있다.
 topic 선언은 `NewTopic` 빈으로 두고, 이미 있는 topic의 설정은 바꾸지 않는다.
 
