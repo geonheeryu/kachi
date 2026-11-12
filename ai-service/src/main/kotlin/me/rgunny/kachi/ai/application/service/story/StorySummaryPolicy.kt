@@ -9,13 +9,11 @@ import java.time.Instant
  * story 요약 트리거의 판정 기준.
  *
  * 즉시 트리거는 미요약 기사 수가 [minNewArticles]에 닿았는가로, tick 트리거는 기준 시각이 [maxWait]를 넘겼는가로 본다.
- * [eventsEnabled]는 story 경로 이벤트를 outbox에 남길지 정한다.
  */
 class StorySummaryPolicy(
     val minNewArticles: Int,
     val maxWait: Duration,
-    val maxArticlesPerVersion: Int,
-    val eventsEnabled: Boolean
+    val maxArticlesPerVersion: Int
 ) {
     init {
         require(minNewArticles >= 1) { "min-new-articles는 1 이상이어야 합니다: $minNewArticles" }

@@ -5,15 +5,11 @@ import kotlinx.coroutines.delay
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmGenerationMetadata
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryPlan
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryPlan
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.keyword.ExpandedKeyword
 import me.rgunny.kachi.ai.domain.llm.LlmProvider
@@ -37,7 +33,6 @@ open class NamedLlmProviderPort(
     private val provider: LlmProvider = AiTestFixture.PROVIDER
 ) : LlmProviderPort {
     var expandCallCount: Int = 0
-    var summarizeCallCount: Int = 0
     var summarizeStoryCallCount: Int = 0
     val failures: ArrayDeque<Throwable> = ArrayDeque()
     var callDelay: Duration = Duration.ZERO
@@ -45,17 +40,7 @@ open class NamedLlmProviderPort(
     var callLog: MutableList<String> = mutableListOf()
 
     val callCount: Int
-        get() = expandCallCount + summarizeCallCount + summarizeStoryCallCount
-
-    override fun prepareNewsSummary(): PreparedLlmNewsSummary {
-        return FakePreparedNewsSummary(
-            plan = LlmNewsSummaryPlan(
-                provider = provider,
-                promptVersion = AiTestFixture.NEWS_SUMMARY_PROMPT_VERSION
-            ),
-            provider = this
-        )
-    }
+        get() = expandCallCount + summarizeStoryCallCount
 
     override suspend fun expandKeyword(
         keyword: AiKeyword,
@@ -67,21 +52,6 @@ open class NamedLlmProviderPort(
         return LlmKeywordExpansionResult(
             expandedKeywords = listOf(ExpandedKeyword.of("AI 반도체")),
             metadata = metadata(AiTestFixture.KEYWORD_EXPANSION_PROMPT_VERSION)
-        )
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        summarizeCallCount += 1
-        awaitCall()
-
-        return LlmNewsSummaryResult(
-            title = "요약",
-            content = "본문",
-            sentiment = NewsSummarySentiment.UNKNOWN,
-            metadata = metadata(AiTestFixture.NEWS_SUMMARY_PROMPT_VERSION)
         )
     }
 

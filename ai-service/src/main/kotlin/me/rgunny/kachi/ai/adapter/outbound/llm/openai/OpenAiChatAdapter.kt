@@ -7,15 +7,11 @@ import me.rgunny.kachi.ai.application.exception.LlmProviderException
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmGenerationMetadata
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryPlan
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryPlan
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmNewsSummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreparedLlmStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.keyword.ExpandedKeyword
 import me.rgunny.kachi.ai.domain.llm.KeywordExpansionPrompt
@@ -23,7 +19,6 @@ import me.rgunny.kachi.ai.domain.llm.LlmFailure
 import me.rgunny.kachi.ai.domain.llm.LlmFailureCode
 import me.rgunny.kachi.ai.domain.llm.LlmModel
 import me.rgunny.kachi.ai.domain.llm.LlmPrompt
-import me.rgunny.kachi.ai.domain.llm.NewsSummaryPrompt
 import me.rgunny.kachi.ai.domain.llm.StorySummaryPrompt
 import me.rgunny.kachi.ai.domain.llm.TokenUsage
 import org.springframework.http.HttpHeaders
@@ -48,16 +43,6 @@ class OpenAiChatAdapter(
     private val jsonMapper: JsonMapper,
     private val model: LlmModel
 ) : LlmProviderPort {
-
-    override fun prepareNewsSummary(): PreparedLlmNewsSummary {
-        return OpenAiPreparedNewsSummary(
-            plan = LlmNewsSummaryPlan(
-                provider = model.provider,
-                promptVersion = NewsSummaryPrompt.version
-            ),
-            adapter = this
-        )
-    }
 
     override fun prepareStorySummary(): PreparedLlmStorySummary {
         return OpenAiPreparedStorySummary(
@@ -89,26 +74,6 @@ class OpenAiChatAdapter(
         return LlmKeywordExpansionResult(
             expandedKeywords = expandedKeywords,
             metadata = metadata(response, KeywordExpansionPrompt)
-        )
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        require(articles.isNotEmpty()) { "news summary articles are required" }
-
-        val response = requestChatCompletion(
-            prompt = NewsSummaryPrompt,
-            input = NewsSummaryPrompt.input(keyword, articles.map(::promptArticle))
-        )
-        val parsed = parseNewsSummary(response.firstContent())
-
-        return LlmNewsSummaryResult(
-            title = parsed.title.trim(),
-            content = parsed.content.trim(),
-            sentiment = parsed.sentiment(),
-            metadata = metadata(response, NewsSummaryPrompt)
         )
     }
 
@@ -300,14 +265,6 @@ class OpenAiChatAdapter(
             .filter { it.isNotBlank() }
     }
 
-    private fun promptArticle(article: NewsArticle): NewsSummaryPrompt.Article {
-        return NewsSummaryPrompt.Article(
-            source = article.source,
-            title = article.title,
-            publishedAt = article.publishedAt
-        )
-    }
-
     private fun promptStoryArticle(article: StorySummaryArticle): StorySummaryPrompt.Article {
         return StorySummaryPrompt.Article(
             source = article.source,
@@ -331,25 +288,6 @@ class OpenAiChatAdapter(
         }
         if (parsed.content.isBlank()) {
             throw invalidResponse("LLM story summary content is empty")
-        }
-
-        return parsed
-    }
-
-    private fun parseNewsSummary(content: String): ParsedNewsSummary {
-        val jsonObject = extractJsonObject(content, "LLM news summary response must contain a JSON object")
-        val parsed = runCatching {
-            jsonMapper
-                .readerFor(ParsedNewsSummary::class.java)
-                .without(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .readValue<ParsedNewsSummary>(jsonObject)
-        }.getOrElse { throw invalidResponse("LLM news summary response is not a valid JSON object") }
-
-        if (parsed.title.isBlank()) {
-            throw invalidResponse("LLM news summary title is empty")
-        }
-        if (parsed.content.isBlank()) {
-            throw invalidResponse("LLM news summary content is empty")
         }
 
         return parsed

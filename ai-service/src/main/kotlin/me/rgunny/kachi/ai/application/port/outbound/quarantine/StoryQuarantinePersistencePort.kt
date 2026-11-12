@@ -30,8 +30,6 @@ interface StoryQuarantinePersistencePort {
 
     /**
      * 격리 전이와 발행 대기 이벤트를 한 트랜잭션으로 저장한다.
-     *
-     * [outbox]가 null이면 이벤트 없이 전이만 저장한다.
      */
-    suspend fun saveQuarantined(quarantine: StoryQuarantine, outbox: AiOutbox?): StoryQuarantine
+    suspend fun saveQuarantined(quarantine: StoryQuarantine, outbox: AiOutbox): StoryQuarantine
 }

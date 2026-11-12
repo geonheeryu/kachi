@@ -17,6 +17,7 @@ import tools.jackson.databind.json.JsonMapper
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 @DisplayName("KafkaNotificationRequestPublisher")
 class KafkaNotificationRequestPublisherTest {
@@ -33,17 +34,41 @@ class KafkaNotificationRequestPublisherTest {
 
         val record = template.sent.single()
         assertEquals("notification.requested", record.topic())
-        assertEquals("sum:summary-1:u:user-1:c:SLACK", record.key())
+        assertEquals("sum:story-1:2:u:user-1:c:SLACK", record.key())
         val event = jsonMapper.readValue(record.value(), NotificationRequestedEvent::class.java)
         assertEquals(NotificationRequestedEvent.CURRENT_SCHEMA_VERSION, event.schemaVersion)
-        assertEquals("sum:summary-1:u:user-1:c:SLACK", event.requestId)
+        assertEquals("sum:story-1:2:u:user-1:c:SLACK", event.requestId)
         assertEquals("notification-routing", event.requester)
         assertEquals(NotificationChannel.SLACK, event.channel)
         assertEquals("user-1", event.recipientId)
         assertEquals("summary body", event.message)
-        assertEquals("summary-1", event.origin?.summaryId)
-        assertEquals("tesla", event.origin?.keyword)
-        assertEquals("user-1", event.origin?.userId)
+        val origin = event.origin!!
+        assertEquals("summary-1", origin.summaryId)
+        assertEquals("story-1", origin.storyId)
+        assertEquals(2L, origin.version)
+        assertEquals(listOf("nvidia", "tsmc"), origin.keywords)
+        assertEquals("user-1", origin.userId)
+    }
+
+    @Test
+    @DisplayName("격리 요청의 출처는 storyId와 userId만 싣는다")
+    fun publishQuarantineOrigin() = runBlocking {
+        val template = RecordingKafkaTemplate()
+        val publisher = KafkaNotificationRequestPublisher(template, jsonMapper, "notification.requested")
+
+        publisher.publish(
+            request().copy(
+                requestId = "qrt:quarantine-1:1700000000000:u:user-1:c:SLACK",
+                origin = NotificationRequestOrigin(summaryId = null, storyId = "story-1", version = null, keywords = emptyList(), userId = "user-1"),
+            )
+        )
+
+        val origin = jsonMapper.readValue(template.sent.single().value(), NotificationRequestedEvent::class.java).origin!!
+        assertNull(origin.summaryId)
+        assertEquals("story-1", origin.storyId)
+        assertNull(origin.version)
+        assertEquals(emptyList(), origin.keywords)
+        assertEquals("user-1", origin.userId)
     }
 
     @Test
@@ -65,12 +90,18 @@ class KafkaNotificationRequestPublisherTest {
 
     private fun request(): NotificationRequest {
         return NotificationRequest(
-            requestId = "sum:summary-1:u:user-1:c:SLACK",
+            requestId = "sum:story-1:2:u:user-1:c:SLACK",
             requester = "notification-routing",
             channel = NotificationChannel.SLACK,
             recipientId = "user-1",
             message = "summary body",
-            origin = NotificationRequestOrigin("summary-1", "tesla", "user-1"),
+            origin = NotificationRequestOrigin(
+                summaryId = "summary-1",
+                storyId = "story-1",
+                version = 2,
+                keywords = listOf("nvidia", "tsmc"),
+                userId = "user-1",
+            ),
         )
     }
 

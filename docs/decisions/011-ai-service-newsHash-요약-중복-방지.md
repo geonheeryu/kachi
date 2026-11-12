@@ -30,34 +30,34 @@ sourceNewsIds = [A, B, C, D]
 
 ## 결정
 
-뉴스 요약 결과에는 `newsHash`를 저장한다.
+~~뉴스 요약 결과에는 `newsHash`를 저장한다.~~ ADR 035에서 폐지. 키워드 요약 경로와 `news_summaries`가 없고, story 요약 버전의 중복은 `(storyId, version)`이 막는다(ADR 034).
 
-`newsHash`는 다음 값을 기준으로 계산한다.
+~~`newsHash`는 다음 값을 기준으로 계산한다.~~
 
 ```text
 keyword
 sourceNewsIds
 ```
 
-계산 방식은 다음과 같다.
+~~계산 방식은 다음과 같다.~~
 
-1. `sourceNewsIds`를 중복 제거하고 정렬한다.
-2. `keyword`와 정렬된 `sourceNewsIds`를 문자열로 직렬화한다.
-3. 직렬화한 문자열을 SHA-256 hex 문자열로 변환한다.
+1. ~~`sourceNewsIds`를 중복 제거하고 정렬한다.~~
+2. ~~`keyword`와 정렬된 `sourceNewsIds`를 문자열로 직렬화한다.~~
+3. ~~직렬화한 문자열을 SHA-256 hex 문자열로 변환한다.~~
 
-MongoDB `news_summaries` collection에는 다음 unique index를 둔다.
+~~MongoDB `news_summaries` collection에는 다음 unique index를 둔다.~~
 
 ```text
 keyword + newsHash + promptVersion
 ```
 
-저장 전에 같은 키로 선조회해 이미 있으면 그 요약을 재사용하고, 없을 때만 LLM을 호출한다.
-동시 실행으로 선조회를 둘 다 통과한 경우는 unique index가 두 번째 insert를 막고, 그때는 기존 문서를 다시 읽어 반환한다.
+~~저장 전에 같은 키로 선조회해 이미 있으면 그 요약을 재사용하고, 없을 때만 LLM을 호출한다.~~
+~~동시 실행으로 선조회를 둘 다 통과한 경우는 unique index가 두 번째 insert를 막고, 그때는 기존 문서를 다시 읽어 반환한다.~~ ADR 035에서 폐지.
 
-같은 뉴스 입력이라도 prompt version이 바뀌면 새 요약을 저장할 수 있다.
-`model`과 `provider`는 요약 문서에 기록 필드로 남기지만 저장 키에는 넣지 않는다.
+~~같은 뉴스 입력이라도 prompt version이 바뀌면 새 요약을 저장할 수 있다.~~
+~~`model`과 `provider`는 요약 문서에 기록 필드로 남기지만 저장 키에는 넣지 않는다.~~ ADR 035에서 폐지.
 
-`keyword_expansions` collection도 같은 원칙으로 `keyword + promptVersion`을 unique index로 두고, 저장 전에 선조회해 재사용한다.
+`keyword_expansions` collection은 `keyword + promptVersion`을 unique index로 두고, 저장 전에 선조회해 재사용한다.
 
 ### 조회 기간을 hash 입력에 넣지 않는 이유
 
@@ -324,8 +324,9 @@ AI에게 제안받았지만, 해당 사전지식이 없음과 다음 개발에 �
 
 ## 결과
 
-- `newsHash`는 뉴스 중복 판별용 값이 아니라 뉴스 요약 입력 묶음의 fingerprint다.
-- `newsHash`는 겹친 조회 구간의 재요약을 막지 못한다. 묶음에 새 기사가 하나라도 더해지면 다른 hash가 된다(2026-09-07 관측, ADR 031). 막는 것은 완전히 같은 묶음의 재저장뿐이다.
-- 요약 단위가 story로 바뀌면 `(storyId, version)`이 이 역할을 대신한다(ADR 034).
-- 저장 중복 방지 기준은 `keyword + newsHash + promptVersion`으로 둔다. `model`·`provider`는 기록 필드다.
+- ~~`newsHash`는 뉴스 중복 판별용 값이 아니라 뉴스 요약 입력 묶음의 fingerprint다.~~ ADR 035에서 폐지.
+- `newsHash`는 겹친 조회 구간의 재요약을 막지 못했다. 막는 것은 완전히 같은 묶음의 재저장뿐이었다.
+  - 묶음에 새 기사가 하나라도 더해지면 다른 hash가 된다(2026-09-07 관측, ADR 031).
+- story 요약은 `(storyId, version)`이 중복을 막는다(ADR 034).
+- ~~저장 중복 방지 기준은 `keyword + newsHash + promptVersion`으로 둔다. `model`·`provider`는 기록 필드다.~~ ADR 035에서 폐지.
 - 실험 결과는 위 표에 누적하고, 실제 운영 정책은 중복 저장 차단과 idempotent 재실행 처리 요구가 확정될 때 다시 조정한다.

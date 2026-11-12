@@ -2,21 +2,15 @@ package me.rgunny.kachi.ai.adapter.outbound.outbox
 
 import me.rgunny.kachi.ai.application.port.outbound.outbox.AiOutboxEventSerializer
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.AiOutboxEvent
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.KeywordQuarantinedEvent
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.StoryQuarantinedEvent
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.StorySplitRequestedEvent
 import me.rgunny.kachi.ai.application.port.outbound.outbox.model.StorySummaryCreatedEvent
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.SummaryCreatedEvent
 import me.rgunny.kachi.ai.contract.AiDevelopmentKind
 import me.rgunny.kachi.ai.contract.AiFailureReason
-import me.rgunny.kachi.ai.contract.AiKeywordQuarantinedEvent
 import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
 import me.rgunny.kachi.ai.contract.AiStorySplitRequestedEvent
 import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
 import me.rgunny.kachi.ai.contract.AiSummarySentiment
-import me.rgunny.kachi.ai.contract.AiTargetType
-import me.rgunny.kachi.ai.domain.run.AiRunTargetType
 import me.rgunny.kachi.ai.domain.summary.NewsSummarySentiment
 import me.rgunny.kachi.ai.domain.summary.StoryDevelopmentKind
 import org.springframework.stereotype.Component
@@ -33,8 +27,6 @@ class JacksonAiOutboxEventSerializer(
 
     override fun serialize(event: AiOutboxEvent): String {
         val contract: Any = when (event) {
-            is SummaryCreatedEvent -> toContract(event)
-            is KeywordQuarantinedEvent -> toContract(event)
             is StorySummaryCreatedEvent -> toContract(event)
             is StorySplitRequestedEvent -> toContract(event)
             is StoryQuarantinedEvent -> toContract(event)
@@ -43,36 +35,8 @@ class JacksonAiOutboxEventSerializer(
         return jsonMapper.writeValueAsString(contract)
     }
 
-    private fun toContract(event: SummaryCreatedEvent): AiSummaryCreatedEvent {
+    private fun toContract(event: StorySummaryCreatedEvent): AiSummaryCreatedEvent {
         return AiSummaryCreatedEvent(
-            schemaVersion = event.schemaVersion,
-            summaryId = event.summaryId.toString(),
-            keyword = event.keyword,
-            title = event.title,
-            content = event.content,
-            sentiment = toContract(event.sentiment),
-            sourceNewsCount = event.sourceNewsCount,
-            provider = event.provider,
-            model = event.model,
-            promptVersion = event.promptVersion,
-            createdAt = event.createdAt
-        )
-    }
-
-    private fun toContract(event: KeywordQuarantinedEvent): AiKeywordQuarantinedEvent {
-        return AiKeywordQuarantinedEvent(
-            schemaVersion = event.schemaVersion,
-            quarantineId = event.quarantineId.toString(),
-            targetType = toContract(event.targetType),
-            keyword = event.keyword,
-            consecutiveFailures = event.consecutiveFailures,
-            lastFailureReason = toContract(event.lastFailureReason),
-            quarantinedAt = event.quarantinedAt
-        )
-    }
-
-    private fun toContract(event: StorySummaryCreatedEvent): AiSummaryCreatedEventV2 {
-        return AiSummaryCreatedEventV2(
             schemaVersion = event.schemaVersion,
             summaryId = event.summaryId.toString(),
             storyId = event.storyId.toString(),
@@ -128,13 +92,6 @@ class JacksonAiOutboxEventSerializer(
         }
     }
 
-    private fun toContract(targetType: AiRunTargetType): AiTargetType {
-        return when (targetType) {
-            AiRunTargetType.KEYWORD_EXPANSION -> AiTargetType.KEYWORD_EXPANSION
-            AiRunTargetType.NEWS_SUMMARY -> AiTargetType.NEWS_SUMMARY
-        }
-    }
-
     private fun toContract(reason: DomainFailureReason): AiFailureReason {
         return when (reason) {
             DomainFailureReason.TIMEOUT -> AiFailureReason.TIMEOUT
@@ -147,7 +104,6 @@ class JacksonAiOutboxEventSerializer(
             // 4xx 계열(격리 이벤트에 실리지 않는 코드)
             DomainFailureReason.MODEL_NOT_FOUND,
             DomainFailureReason.ACCOUNT_ERROR -> AiFailureReason.CLIENT_ERROR
-            DomainFailureReason.EMPTY_INPUT -> AiFailureReason.EMPTY_INPUT
             DomainFailureReason.UNKNOWN -> AiFailureReason.UNKNOWN
         }
     }

@@ -1,6 +1,5 @@
 package me.rgunny.kachi.ai.adapter.outbound.persistence.run
 
-import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -71,36 +70,6 @@ class AiRunPersistenceAdapterIntegrationTest : PersistenceAdapterIntegrationTest
             assertEquals(LlmProvider.OPENROUTER, found.provider)
             assertEquals("openai/gpt-4o-mini", found.model)
             assertEquals(PromptVersion.of("keyword-expansion-v1"), found.promptVersion)
-        }
-
-        @Test
-        @DisplayName("처리한 구간과 watermark 전진 여부를 함께 저장한다")
-        fun saveWindowAndWatermarkAdvanced() = runBlocking {
-            val windowFrom = AiTestFixture.NOW.minus(Duration.ofMinutes(5))
-            val completedRun = AiRun.start(
-                targetType = AiRunTargetType.NEWS_SUMMARY,
-                requestedKeywords = 1,
-                startedAt = startedAt,
-                windowFrom = windowFrom,
-                windowTo = startedAt
-            ).complete(
-                succeededCount = 1,
-                failureCount = 0,
-                failureReason = null,
-                provider = null,
-                model = null,
-                promptVersion = null,
-                finishedAt = finishedAt,
-                watermarkAdvanced = true
-            )
-
-            val saved = adapter.save(completedRun)
-            val found = adapter.findById(saved.id)
-
-            assertNotNull(found)
-            assertEquals(windowFrom, found.windowFrom)
-            assertEquals(startedAt, found.windowTo)
-            assertEquals(true, found.watermarkAdvanced)
         }
     }
 

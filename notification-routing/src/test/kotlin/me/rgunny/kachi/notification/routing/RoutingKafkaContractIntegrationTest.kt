@@ -4,13 +4,12 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import me.rgunny.kachi.ai.contract.AiKeywordQuarantinedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.notification.contract.NotificationChannel
 import me.rgunny.kachi.notification.contract.NotificationRequestedEvent
-import me.rgunny.kachi.notification.routing.adapter.inbound.messaging.AiKeywordQuarantinedEventMapper
 import me.rgunny.kachi.notification.routing.adapter.outbound.persistence.job.RoutingJobDocument
+import me.rgunny.kachi.notification.routing.application.service.RoutingEventKey
 import me.rgunny.kachi.notification.routing.application.service.RoutingRequestId
 import me.rgunny.kachi.notification.routing.config.NotificationRoutingProperties
 import me.rgunny.kachi.notification.routing.support.RoutingTestFixture
@@ -36,7 +35,7 @@ import org.testcontainers.kafka.KafkaContainer
 import tools.jackson.databind.json.JsonMapper
 
 /**
- * routing이 `ai.*` 레코드를 실제 broker에서 소비해 `notification.requested`로 발행하는 계약을 본다.
+ * routing이 `ai.summary.created`(schemaVersion 2)와 `ai.story.quarantined` 레코드를 실제 broker에서 소비해 `notification.requested`로 발행하는 계약을 본다.
  *
  * 입력은 producer 계약 타입(`ai-contract`)으로 만들어 발행하고, 출력은 소비자 계약 타입(`notification-contract`)으로 읽는다.
  * user-service는 테스트 JVM 안의 stub이 받는다. broker 경계에서 key·payload가 계약과 맞는지만 본다.
@@ -68,87 +67,105 @@ class RoutingKafkaContractIntegrationTest {
     }
 
     @Test
-    @DisplayName("요약 이벤트를 소비하면 구독자 x 채널만큼 requestId를 key로 접수 이벤트를 발행한다")
+    @DisplayName("v2 요약을 소비하면 두 페이지의 구독 수신자 x 채널 전부를 sum:{storyId}:{version} requestId key로 발행한다")
     fun publishRequestedEventsForSubscribers() {
-        val keyword = uniqueKeyword("tesla")
+        val storyId = uniqueId("story")
         val summaryId = UUID.randomUUID().toString()
-        userService.respond(
-            RoutingTestFixture.SUBSCRIPTIONS_PATH,
-            TestStubResponse(
-                statusCode = 200,
-                body = """{"success":true,"data":[{"userId":"user-1","channel":"SLACK"},{"userId":"user-1","channel":"TELEGRAM"},{"userId":"user-2","channel":"DISCORD"}]}"""
+        val version = 3L
+        userService.enqueue(
+            RoutingTestFixture.RECIPIENTS_SEARCH_PATH,
+            recipientPage(
+                recipients = """[{"userId":"user-1","channel":"SLACK","keywordIndexes":[0,1]},{"userId":"user-1","channel":"TELEGRAM","keywordIndexes":[1]}]""",
+                nextCursor = "\"user-1\"",
             )
         )
-        val event = RoutingTestFixture.summaryCreatedEvent(summaryId = summaryId, keyword = keyword)
-
-        kafkaTemplate.send(properties.topics.summaryCreated, keyword, jsonMapper.writeValueAsString(event)).get()
-
-        val expectedKeys = setOf(
-            RoutingRequestId.forSummary(summaryId, "user-1", NotificationChannel.SLACK),
-            RoutingRequestId.forSummary(summaryId, "user-1", NotificationChannel.TELEGRAM),
-            RoutingRequestId.forSummary(summaryId, "user-2", NotificationChannel.DISCORD)
+        userService.enqueue(
+            RoutingTestFixture.RECIPIENTS_SEARCH_PATH,
+            recipientPage(
+                recipients = """[{"userId":"user-2","channel":"DISCORD","keywordIndexes":[0]}]""",
+                nextCursor = "null",
+            )
         )
-        val records = recordsOf(properties.requestTopic, expected = 3) { it.key() in expectedKeys }
-        assertEquals(expectedKeys, records.map { it.key() }.toSet())
+        val event = RoutingTestFixture.summaryCreatedEvent(summaryId = summaryId, storyId = storyId, version = version)
+
+        kafkaTemplate.send(properties.topics.summaryCreated, storyId, jsonMapper.writeValueAsString(event)).get()
+
+        val expectedKeywords = mapOf(
+            RoutingRequestId.forSummary(storyId, version, "user-1", NotificationChannel.SLACK) to listOf("nvidia", "tsmc"),
+            RoutingRequestId.forSummary(storyId, version, "user-1", NotificationChannel.TELEGRAM) to listOf("tsmc"),
+            RoutingRequestId.forSummary(storyId, version, "user-2", NotificationChannel.DISCORD) to listOf("nvidia"),
+        )
+        val records = recordsOf(properties.requestTopic, expected = 3) { it.key() in expectedKeywords }
+        assertEquals(expectedKeywords.keys, records.map { it.key() }.toSet())
         records.forEach { record ->
             val requested = jsonMapper.readValue(record.value(), NotificationRequestedEvent::class.java)
             assertEquals(NotificationRequestedEvent.CURRENT_SCHEMA_VERSION, requested.schemaVersion)
             assertEquals(record.key(), requested.requestId)
             assertEquals("notification-routing", requested.requester)
-            assertEquals(summaryId, requested.origin?.summaryId)
-            assertEquals(keyword, requested.origin?.keyword)
+            val origin = requested.origin!!
+            assertEquals(summaryId, origin.summaryId)
+            assertEquals(storyId, origin.storyId)
+            assertEquals(version, origin.version)
+            assertEquals(expectedKeywords.getValue(record.key()), origin.keywords)
+            assertEquals(requested.recipientId, origin.userId)
             assertTrue(requested.message.contains(event.title))
         }
-        assertEquals(1, userService.requestCount(RoutingTestFixture.SUBSCRIPTIONS_PATH))
+        val requestBodies = userService.bodies.getValue(RoutingTestFixture.RECIPIENTS_SEARCH_PATH).map(jsonMapper::readTree)
+        assertEquals(2, requestBodies.size)
+        assertEquals(listOf("nvidia", "tsmc"), requestBodies[0].get("keywords").values().map { it.asString() })
+        assertTrue(requestBodies[0].get("cursor").isNull)
+        assertEquals("user-1", requestBodies[1].get("cursor").asString())
     }
 
     @Test
-    @DisplayName("격리 이벤트를 소비하면 관리자 x 채널만큼 qrt requestId로 발행한다")
+    @DisplayName("story 격리를 소비하면 관리자 x 채널만큼 qrt requestId key로 발행한다")
     fun publishRequestedEventsForAdmins() {
-        val keyword = uniqueKeyword("quarantined")
+        val storyId = uniqueId("quarantined")
         userService.respond(
             RoutingTestFixture.USERS_PATH,
             TestStubResponse(
                 statusCode = 200,
-                body = """{"success":true,"data":[{"userId":"admin-1","channels":["SLACK","TELEGRAM"]}]}"""
+                body = """{"success":true,"data":[{"userId":"user-9","channels":["SLACK","TELEGRAM"]}]}"""
             )
         )
-        val event = RoutingTestFixture.keywordQuarantinedEvent(quarantineId = UUID.randomUUID().toString(), keyword = keyword)
-        val eventKey = AiKeywordQuarantinedEventMapper.eventKey(event)
+        val event = RoutingTestFixture.storyQuarantinedEvent(quarantineId = UUID.randomUUID().toString(), storyId = storyId)
+        val eventKey = RoutingEventKey.forQuarantine(event.quarantineId, event.quarantinedAt)
 
-        kafkaTemplate.send(properties.topics.keywordQuarantined, keyword, jsonMapper.writeValueAsString(event)).get()
+        kafkaTemplate.send(properties.topics.storyQuarantined, storyId, jsonMapper.writeValueAsString(event)).get()
 
         val expectedKeys = setOf(
-            RoutingRequestId.forQuarantine(eventKey, "admin-1", NotificationChannel.SLACK),
-            RoutingRequestId.forQuarantine(eventKey, "admin-1", NotificationChannel.TELEGRAM)
+            RoutingRequestId.forQuarantine(eventKey, "user-9", NotificationChannel.SLACK),
+            RoutingRequestId.forQuarantine(eventKey, "user-9", NotificationChannel.TELEGRAM)
         )
         val records = recordsOf(properties.requestTopic, expected = 2) { it.key() in expectedKeys }
         assertEquals(expectedKeys, records.map { it.key() }.toSet())
         records.forEach { record ->
             val requested = jsonMapper.readValue(record.value(), NotificationRequestedEvent::class.java)
-            assertEquals(keyword, requested.origin?.keyword)
-            assertTrue(requested.message.contains(keyword))
+            val origin = requested.origin!!
+            assertEquals(storyId, origin.storyId)
+            assertEquals("user-9", origin.userId)
+            assertNull(origin.summaryId)
+            assertNull(origin.version)
+            assertTrue(origin.keywords.isEmpty())
+            assertTrue(requested.message.contains(storyId))
         }
     }
 
     @Test
-    @DisplayName("모르는 schemaVersion은 재시도 없이 DLT로 보내고 접수 이벤트를 만들지 않는다")
+    @DisplayName("모르는 schemaVersion은 재시도 없이 DLT로 보내고 user-service를 부르지 않으며 접수 이벤트를 만들지 않는다")
     fun sendUnknownSchemaVersionToDlt() {
-        val keyword = uniqueKeyword("unknown-schema")
-        val event = RoutingTestFixture.summaryCreatedEvent(
-            schemaVersion = AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION + 1,
-            summaryId = UUID.randomUUID().toString(),
-            keyword = keyword
-        )
+        val storyId = uniqueId("unknown-schema")
+        val event = RoutingTestFixture.summaryCreatedEvent(storyId = storyId, summaryId = UUID.randomUUID().toString())
+        val payload = jsonMapper.writeValueAsString(event).replace("\"schemaVersion\":2", "\"schemaVersion\":1")
 
-        kafkaTemplate.send(properties.topics.summaryCreated, keyword, jsonMapper.writeValueAsString(event)).get()
+        kafkaTemplate.send(properties.topics.summaryCreated, storyId, payload).get()
 
-        val dlt = recordsOf(properties.dlt.topic, expected = 1) { it.key() == keyword }
+        val dlt = recordsOf(properties.dlt.topic, expected = 1) { it.key() == storyId }
         assertEquals(1, dlt.size)
-        assertEquals(jsonMapper.writeValueAsString(event), dlt.single().value())
+        assertEquals(payload, dlt.single().value())
         // user-service를 부르기 전에 걸러진다.
-        assertEquals(0, userService.requestCount(RoutingTestFixture.SUBSCRIPTIONS_PATH))
-        assertTrue(recordsOf(properties.requestTopic, expected = 1, timeout = SHORT_TIMEOUT) { it.key().contains(event.summaryId) }.isEmpty())
+        assertEquals(0, userService.requestCount(RoutingTestFixture.RECIPIENTS_SEARCH_PATH))
+        assertTrue(recordsOf(properties.requestTopic, expected = 1, timeout = SHORT_TIMEOUT) { it.key().contains(storyId) }.isEmpty())
     }
 
     private fun recordsOf(
@@ -175,7 +192,14 @@ class RoutingKafkaContractIntegrationTest {
         }
     }
 
-    private fun uniqueKeyword(prefix: String): String = "$prefix-${UUID.randomUUID().toString().take(8)}"
+    private fun uniqueId(prefix: String): String = "$prefix-${UUID.randomUUID().toString().take(8)}"
+
+    private fun recipientPage(recipients: String, nextCursor: String): TestStubResponse {
+        return TestStubResponse(
+            statusCode = 200,
+            body = """{"success":true,"data":{"keywords":[{"canonicalKey":"nvidia","displayName":"NVIDIA"},{"canonicalKey":"tsmc","displayName":"TSMC"}],"recipients":$recipients,"nextCursor":$nextCursor},"error":null}"""
+        )
+    }
 
     companion object {
         private val POLL_TIMEOUT: Duration = Duration.ofSeconds(20)

@@ -55,11 +55,11 @@ canonical 행은 `canonicalKey`당 하나이므로 이는 ADR 025의 `(userId, c
 ### 활성 키워드 API의 `name`은 canonicalKey다
 
 collector·ai·routing이 키워드를 맞춰 보는 join key는 정규화된 문자열이다(ADR 025).  
-collector와 ai는 응답의 `name`만 읽어 그 문자열로 뉴스를 수집·저장하고, ai는 그 값을 이벤트의 `keyword`로 발행한다.  
-routing은 그 `keyword`로 `GET /internal/subscriptions?keyword=`를 묻는다.  
+collector는 응답의 `name`으로 기사를 수집해 그 문자열을 기사의 `matchedKeywords`에 싣고, story의 `keywords`와 요약 이벤트의 `keywords`가 그 값을 이어받는다.  
+routing은 이벤트의 `keywords`로 구독 수신자 조회를 묻는다.  
 `name`이 원문이면 routing이 조회 전에 정규화를 한 번 더 해야 하고, 두 서비스가 같은 normalize 구현을 가져야 한다.  
 그래서 `name`에 canonicalKey를 보낸다. 응답에는 `keywordId`, `canonicalKey`, `displayName`을 함께 싣는다.  
-collector·ai의 클라이언트 코드는 바뀌지 않는다(추가 필드는 무시된다).
+collector·ai의 클라이언트는 `name`만 읽는다(추가 필드는 무시된다).
 
 대가는 수집·요약이 소문자 정규화 문자열로 돈다는 것이다.  
 검색 provider는 대소문자를 구분하지 않고, LLM 프롬프트의 키워드도 마찬가지라 결과 품질에 영향은 없다고 본다.  
@@ -87,15 +87,12 @@ collector·ai의 클라이언트 코드는 바뀌지 않는다(추가 필드는 
 | API | 응답 | 소비자 |
 | --- | --- | --- |
 | `GET /internal/keywords/active` | `[{keywordId, canonicalKey, displayName, name}]` — enabled 구독이 하나 이상인 키워드 | collector, ai |
-| `GET /internal/subscriptions?keyword=` | `[{userId, channel}]` — enabled 구독 x 채널 중 바인딩 ACTIVE만. 없는 키워드는 `[]` | notification-routing |
 | `POST /internal/subscriptions/recipients/search` | `{keywords, recipients: [{userId, channel, keywordIndexes}], nextCursor}`. 여러 키워드의 수신자를 사용자 단위 keyset 커서로 나눠 돌려준다 | notification-routing |
-| `GET /internal/users?role=` | `[{userId, channels}]` — 그 역할의 ACTIVE 사용자 중 ACTIVE 바인딩이 있는 사용자와 그 채널. 바인딩 없는 사용자는 뺀다 | notification-routing (키워드 격리 알림) |
+| `GET /internal/users?role=` | `[{userId, channels}]` — 그 역할의 ACTIVE 사용자 중 ACTIVE 바인딩이 있는 사용자와 그 채널. 바인딩 없는 사용자는 뺀다 | notification-routing (story 격리 알림) |
 | `GET /internal/users/{userId}/channel-bindings/{channel}` | `{channel, status, address}` — ACTIVE일 때만 복호화 주소, 아니면 `address: null`. 바인딩이 없으면 404 | notification-worker (W1) |
 | `POST /internal/channel-bindings/telegram/link` | `{token, chatId}` -> 204. 토큰 무효·만료는 400 `LINK_TOKEN_INVALID` | Telegram 봇 수신기 (후속) |
 
 응답은 모두 활성 키워드 API와 같은 `{success, data, error}` 래핑이다.
-
-구독 조회는 `keyword`를 `CanonicalKey.of`로 한 번 더 정규화해 찾는다. 활성 키워드 API의 `name`을 그대로 보내면 되고 원문이 와도 같은 결과다. 결과는 `userId`, `channel` 순으로 정렬하며, 바인딩은 구독자 집합으로 한 번에 읽어 구독 수만큼 조회하지 않는다. 해지된 바인딩의 채널은 여기서 빠지고 구독은 그대로다.
 
 바인딩 조회는 `ref`가 UUID 형식이 아니면 400, 없는 ref면 404 `CHANNEL_BINDING_NOT_FOUND`다. `PENDING`·`REVOKED`는 상태만 돌려주고 주소는 `null`이다. 주소가 없는 응답을 받은 worker는 그 알림을 `SUPPRESSED`로 끝낸다(W1).
 
@@ -184,7 +181,7 @@ internal API는 인증을 두지 않고 `/api/v1/internal/**`를 `permitAll`로 
   - 같은 키워드를 몇 명이 등록해도 canonical 행은 하나라 수집·요약이 한 번이다.
   - `keywordId`가 처음부터 사용자와 무관한 identity다.
   - 주소가 DB에 평문으로 없고, 이벤트·로그에는 사용자 id와 채널만 남는다.
-  - collector·ai 클라이언트는 바뀌지 않는다.
+  - collector·ai 클라이언트는 `name` 하나만 읽는다.
 - 단점:
   - 기존 `Keyword` aggregate의 이름과 역할이 바뀐다. 이름 변경 API가 사라진다.
   - collector·ai·routing이 다루는 키워드 문자열이 소문자 정규화 값이다.

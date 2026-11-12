@@ -40,7 +40,6 @@ class LlmPropertiesTest {
         val error = assertFailsWith<IllegalArgumentException> {
             AiTestFixture.llmProperties(
                 uses = mapOf(
-                    LlmUse.NEWS_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.GROQ_QWEN3_27B)),
                     LlmUse.STORY_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.GROQ_QWEN3_27B))
                 )
             )
@@ -104,7 +103,6 @@ class LlmPropertiesTest {
     fun allowSelfHostedCandidateWithoutApiKey() {
         val properties = AiTestFixture.llmProperties(
             uses = mapOf(
-                LlmUse.NEWS_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.OLLAMA_QWEN3_27B)),
                 LlmUse.STORY_SUMMARY to LlmProperties.UseProperties(listOf(LlmModel.OLLAMA_QWEN3_27B)),
                 LlmUse.KEYWORD_EXPANSION to LlmProperties.UseProperties(listOf(LlmModel.OLLAMA_QWEN3_27B))
             )
@@ -168,7 +166,7 @@ class LlmPropertiesTest {
 
         assertEquals(
             listOf(LlmModel.GROQ_QWEN3_27B, LlmModel.MISTRAL_SMALL_2603),
-            properties.uses.getValue(LlmUse.NEWS_SUMMARY).candidates
+            properties.uses.getValue(LlmUse.STORY_SUMMARY).candidates
         )
 
         val circuitBreaker = properties.guard.circuitBreaker

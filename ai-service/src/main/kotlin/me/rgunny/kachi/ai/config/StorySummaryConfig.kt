@@ -15,8 +15,7 @@ class StorySummaryConfig {
         return StorySummaryPolicy(
             minNewArticles = properties.minNewArticles,
             maxWait = properties.maxWait,
-            maxArticlesPerVersion = properties.maxArticlesPerVersion,
-            eventsEnabled = properties.eventsEnabled
+            maxArticlesPerVersion = properties.maxArticlesPerVersion
         )
     }
 }

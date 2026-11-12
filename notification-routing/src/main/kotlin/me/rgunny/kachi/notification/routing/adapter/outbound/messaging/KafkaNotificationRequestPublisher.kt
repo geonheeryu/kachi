@@ -38,7 +38,9 @@ class KafkaNotificationRequestPublisher(
             message = request.message,
             origin = NotificationRequestedOrigin(
                 summaryId = request.origin.summaryId,
-                keyword = request.origin.keyword,
+                storyId = request.origin.storyId,
+                version = request.origin.version,
+                keywords = request.origin.keywords,
                 userId = request.origin.userId,
             ),
         )

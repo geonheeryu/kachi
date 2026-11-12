@@ -16,7 +16,6 @@ class AiEventsPropertiesTest {
     @DisplayName("topic은 비어 있을 수 없다")
     fun rejectBlankTopics() {
         assertFailsWith<IllegalArgumentException> { AiTestFixture.eventsProperties(summaryCreatedTopic = " ") }
-        assertFailsWith<IllegalArgumentException> { AiTestFixture.eventsProperties(keywordQuarantinedTopic = "") }
         assertFailsWith<IllegalArgumentException> { AiTestFixture.eventsProperties(storySplitRequestedTopic = " ") }
         assertFailsWith<IllegalArgumentException> { AiTestFixture.eventsProperties(storyQuarantinedTopic = "") }
     }
@@ -29,7 +28,6 @@ class AiEventsPropertiesTest {
 
         val expected = when (eventType) {
             AiOutboxEventType.SUMMARY_CREATED -> AiTestFixture.EVENT_TOPIC_SUMMARY_CREATED
-            AiOutboxEventType.KEYWORD_QUARANTINED -> AiTestFixture.EVENT_TOPIC_KEYWORD_QUARANTINED
             AiOutboxEventType.STORY_SPLIT_REQUESTED -> AiTestFixture.EVENT_TOPIC_STORY_SPLIT_REQUESTED
             AiOutboxEventType.STORY_QUARANTINED -> AiTestFixture.EVENT_TOPIC_STORY_QUARANTINED
         }

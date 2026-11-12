@@ -30,13 +30,6 @@ management:
 kachi:
   ai:
     scheduler:
-      news-summary:
-        enabled: true
-        fixed-delay: 10m
-        initial-delay: 30s
-        overlap: 5m
-        max-lookback: 6h
-        max-articles-per-keyword: 20
       keyword-expansion:
         enabled: false
         fixed-delay: 24h
@@ -51,8 +44,6 @@ kachi:
       min-new-articles: 3
       max-wait: 60m
       max-articles-per-version: 50
-      # v2 계약 소비자(routing 전환)가 붙기 전까지 story 경로 이벤트를 outbox에 남기지 않는다.
-      events-enabled: ${KACHI_AI_STORY_EVENTS_ENABLED:false}
     consumer:
       group-id: ai-service
       auto-offset-reset: earliest
@@ -68,7 +59,7 @@ kachi:
         initial-backoff: 1s
         max-backoff: 30s
         multiplier: 2.0
-    quarantine:
+    story-quarantine:
       failure-threshold: 3
     outbox:
       relay:
@@ -87,18 +78,12 @@ kachi:
       enabled: true
       topics:
         summary-created: ai.summary.created
-        keyword-quarantined: ai.keyword.quarantined
         story-split-requested: ai.story.split-requested
         story-quarantined: ai.story.quarantined
     clients:
       user-service:
         base-url: ${KACHI_USER_SERVICE_BASE_URL:}
         active-keywords-path: /api/v1/internal/keywords/active
-        timeout: 3s
-        max-in-memory-size: 262144
-      collector-service:
-        base-url: ${KACHI_COLLECTOR_SERVICE_BASE_URL:}
-        news-path: /api/v1/internal/news
         timeout: 3s
         max-in-memory-size: 262144
     llm:
@@ -125,8 +110,6 @@ kachi:
         OLLAMA_QWEN3_27B: { timeout: 150s, slow-after: 120s }
       # 용도마다 시도할 모델의 순서. 여기 없는 모델은 클라이언트도 서킷도 만들지 않는다.
       uses:
-        NEWS_SUMMARY:
-          candidates: [GROQ_QWEN3_27B, MISTRAL_SMALL_2603]
         STORY_SUMMARY:
           candidates: [GROQ_QWEN3_27B, MISTRAL_SMALL_2603]
         KEYWORD_EXPANSION:

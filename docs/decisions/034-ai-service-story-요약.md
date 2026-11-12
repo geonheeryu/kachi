@@ -21,7 +21,7 @@ story 경로에서 정해야 하는 것은 다음 넷이다.
 | 미요약 판별 | 마지막 요약 시각과 `attachedAt` 비교 / 기사마다 실린 버전 표시 | 버전 표시 |
 | 요약 시점 | 기사마다 / 주기 tick만 / 미요약 수 즉시 트리거 + 대기 상한 tick | 즉시 트리거 + tick |
 | 멱등 | 기사 id 집합 해시 / `(storyId, version)` | `(storyId, version)` |
-| story 격리 발행 | `ai.keyword.quarantined`에 새 버전 / 새 topic | 새 topic |
+| story 격리 발행 | 키워드 격리 topic에 새 버전 / 새 topic | 새 topic |
 
 ## 결정
 
@@ -86,9 +86,8 @@ LLM은 직전 버전 요약과 새 기사를 함께 받아 요약과 `developmen
 
 ### 실패와 격리
 
-격리 판정은 키워드 요약과 같다(ADR 021).
-시도한 후보 전부가 입력 탓으로 끝난 실패만 story 탓으로 세고, 연속 실패가 `kachi.ai.quarantine.failure-threshold`에 닿으면 `StoryQuarantine`이 격리 상태가 된다.
-임계값을 키워드 격리와 같이 쓰는 이유는 같은 정책 값이고 설정 키가 대상을 가리지 않기 때문이다.
+격리 판정은 ADR 021의 규칙을 따른다.
+시도한 후보 전부가 입력 탓으로 끝난 실패만 story 탓으로 세고, 연속 실패가 `kachi.ai.story-quarantine.failure-threshold`에 닿으면 `StoryQuarantine`이 격리 상태가 된다.
 
 해제는 운영자가 internal API로 한다. 격리 중에도 기사는 기록되고, 해제 뒤 다음 트리거가 쌓인 미요약을 가져간다.
 
@@ -98,20 +97,17 @@ tick 경로에서는 그 story만 실패로 두고 다음 tick을 기다리며, 
 DLT(`ai.story.dlt`)로 보내는 것은 읽을 수 없는 메시지뿐이다. 요약할 수 있는 기사를 DLT에 넣으면 그 기사는 다시 요약되지 않는다.
 
 story 격리는 새 계약 `AiStoryQuarantinedEvent`와 새 topic `ai.story.quarantined`로 발행한다.
-`ai.keyword.quarantined`에 실으면 topic 이름이 내용과 어긋나고, 계약 하나가 두 대상의 필드를 nullable로 갖게 된다.
+키워드 격리 topic에 실으면 topic 이름이 내용과 어긋나고, 계약 하나가 두 대상의 필드를 nullable로 갖게 된다.
 
-주기 tick은 `AiRun`을 남기지 않는다.
-`AiRun`의 필드는 window와 watermark 중심이고, 대상 종류를 늘리면 키워드 격리 계약의 매핑까지 바뀐다. tick 결과는 scheduler 로그에 남는다.
+주기 tick은 `AiRun`을 남기지 않는다. tick 결과는 scheduler 로그에 남는다.
 
 ### 발행 계약과 스위치
 
-story 요약은 `ai.summary.created`에 schemaVersion 2 계약(`AiSummaryCreatedEventV2`)으로 나간다. key는 storyId다.
-키워드 요약의 schemaVersion 1 계약은 키워드 경로가 폐지될 때 함께 지우고, 그때 v2 계약이 `AiSummaryCreatedEvent` 이름을 이어받는다.
-v2 계약의 필드와 발행은 이 ADR이, notification-routing의 v2 소비와 storyId 멱등은 ADR 035가 정한다.
+story 요약은 `ai.summary.created`에 schemaVersion 2 계약 `AiSummaryCreatedEvent`로 나간다. key는 storyId다.
+계약의 필드와 발행은 이 ADR이, notification-routing의 소비와 storyId 멱등은 ADR 035가 정한다.
 
-`kachi.ai.story-summary.events-enabled`가 꺼져 있으면 story 경로의 세 이벤트는 outbox 행 자체를 남기지 않는다. 기본값은 false다.
-v2를 읽지 못하는 소비자가 남아 있는 동안 v2가 topic에 실리면 그 소비자의 DLT가 오염되고, 키워드 요약 알림과 겹쳐 같은 기사가 두 번 알림된다.
-스위치가 꺼진 동안 만든 요약 버전은 나중에 켜도 발행되지 않는다.
+story 경로의 세 이벤트는 요약 버전·격리 전이와 같은 트랜잭션에서 항상 outbox 행을 남긴다. 저장 쪽에 발행을 끄는 설정은 없다.
+발행을 멈추려면 relay(`kachi.ai.outbox.relay.enabled`)를 끈다. 행은 PENDING으로 쌓이고 켜면 발행된다(ADR 023·035).
 
 ## 검토한 대안
 
@@ -132,5 +128,5 @@ v2를 읽지 못하는 소비자가 남아 있는 동안 v2가 topic에 실리�
 
 ## 후속
 
-- ADR 035: notification-routing의 v2 소비와 storyId 멱등. 발행 스위치를 켜는 시점과 키워드 요약 경로 폐지를 함께 정한다.
+- ADR 035: notification-routing의 story 요약 소비와 storyId 멱등, 키워드 요약 경로 폐지.
 - `ai.story.split-requested`의 소비자는 열린 항목이다(ADR 033).

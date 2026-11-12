@@ -28,7 +28,7 @@ sealed interface AiOutboxEvent {
     /** outbox unique index의 값. 같은 이벤트를 두 번 기록하지 않게 막는다. */
     val eventKey: String
 
-    /** 발행 순서를 지켜야 하는 단위. 같은 키워드의 이벤트는 같은 파티션으로 간다. */
+    /** 발행 순서를 지켜야 하는 단위. 같은 story의 이벤트는 같은 파티션으로 간다. */
     val partitionKey: String
 
     companion object {

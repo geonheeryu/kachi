@@ -26,10 +26,10 @@ class RoutingExecutionLockAdapterTest {
             )
         )
 
-        adapter.withLock<Unit>(AiExecutionLock.NEWS_SUMMARY) { }
+        adapter.withLock<Unit>(AiExecutionLock.STORY_SUMMARY) { }
         adapter.withLock<Unit>(AiExecutionLock.OUTBOX_RELAY) { }
 
-        assertEquals(listOf<ExecutionLockTarget>(AiExecutionLock.NEWS_SUMMARY), clusterLock.targets)
+        assertEquals(listOf<ExecutionLockTarget>(AiExecutionLock.STORY_SUMMARY), clusterLock.targets)
         assertEquals(listOf<ExecutionLockTarget>(AiExecutionLock.OUTBOX_RELAY), instanceLock.targets)
     }
 

@@ -14,5 +14,11 @@ interface RoutingJobPersistencePort {
 
     suspend fun findByEventKey(eventKey: String): RoutingJob?
 
-    suspend fun save(job: RoutingJob): RoutingJob
+    /**
+     * 저장된 job이 previous의 id, status, cursor와 같을 때만 next로 갱신하고 갱신된 job을 돌려준다.
+     *
+     * previous와 next는 같은 job이어야 한다.
+     * 조건이 어긋나면 아무것도 바꾸지 않고 RoutingJobTransitionConflictException을 던진다.
+     */
+    suspend fun saveTransition(previous: RoutingJob, next: RoutingJob): RoutingJob
 }

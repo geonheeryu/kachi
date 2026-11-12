@@ -18,7 +18,13 @@ class NotificationDocumentMapperTest {
     @Test
     @DisplayName("Notification aggregate와 document를 상호 변환할 때 상태 snapshot을 보존한다")
     fun roundTrip() {
-        val origin = NotificationOrigin(summaryId = "summary-1", keyword = "tesla", userId = "user-1")
+        val origin = NotificationOrigin(
+            summaryId = "summary-1",
+            storyId = "story-1",
+            version = 2,
+            keywords = listOf("tesla", "nvidia"),
+            userId = "user-1",
+        )
         val requestedAt = Instant.parse("2026-06-16T00:00:00Z")
         val publishedAt = Instant.parse("2026-06-16T00:00:10Z")
         val notification = Notification.request(
@@ -42,7 +48,9 @@ class NotificationDocumentMapperTest {
         assertEquals("user-1", restored.recipientId)
         assertEquals("hello", restored.message)
         assertEquals("summary-1", document.summaryId)
-        assertEquals("tesla", document.keyword)
+        assertEquals("story-1", document.storyId)
+        assertEquals(2L, document.version)
+        assertEquals(listOf("tesla", "nvidia"), document.keywords)
         assertEquals("user-1", document.userId)
         assertEquals(origin, restored.origin)
         assertEquals(requestedAt, restored.requestedAt)

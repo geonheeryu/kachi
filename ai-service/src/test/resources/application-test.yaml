@@ -9,10 +9,6 @@ spring:
 kachi:
   ai:
     scheduler:
-      news-summary:
-        enabled: false
-        fixed-delay: 10m
-        initial-delay: 30s
       story-summary:
         enabled: false
     consumer:
@@ -31,19 +27,12 @@ kachi:
         active-keywords-path: /api/v1/internal/keywords/active
         timeout: 3s
         max-in-memory-size: 262144
-      collector-service:
-        base-url: http://collector-service-test
-        news-path: /api/v1/internal/news
-        timeout: 3s
-        max-in-memory-size: 262144
     # 실 host를 향한 클라이언트를 만들지 않는다. 실제로 부르는 테스트는 base-url을 stub으로 덮는다.
     llm:
       providers:
         OLLAMA:
           base-url: http://llm-test
       uses:
-        NEWS_SUMMARY:
-          candidates: [OLLAMA_QWEN3_27B]
         STORY_SUMMARY:
           candidates: [OLLAMA_QWEN3_27B]
         KEYWORD_EXPANSION:

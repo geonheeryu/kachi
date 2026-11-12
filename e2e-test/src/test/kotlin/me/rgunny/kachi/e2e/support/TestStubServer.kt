@@ -2,71 +2,66 @@ package me.rgunny.kachi.e2e.support
 
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.QueryStringDecoder
 import reactor.core.publisher.Mono
 import reactor.netty.DisposableServer
 import reactor.netty.http.server.HttpServer
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
- * 테스트 대상이 HTTP로 부르는 상대를 대신하는 테스트 JVM 안의 서버.
+ * 테스트 대상이 HTTP로 부르는 외부 vendor를 대신하는 테스트 JVM 안의 서버.
  *
- * 같은 JVM의 서비스는 [baseUrl]로, 컨테이너 안의 서비스는 `host.testcontainers.internal:[port]`로 이 서버에 닿는다.
- *
- * 서비스의 WebClient 조립은 그대로 두고 base-url만 이 서버로 돌린다.
- * path마다 응답 큐를 두어 "처음은 429, 다음은 200"처럼 호출 순서에 따라 다른 응답을 표현한다.
- * 큐가 비면 [respond]로 둔 고정 응답을 돌려주고, 그것도 없으면 404다.
- * 요청 path와 본문은 [paths]와 [bodies]에 기록한다.
+ * 같은 JVM은 [baseUrl]로, 컨테이너 안의 서비스는 `host.testcontainers.internal:[port]`로 닿는다.
+ * path마다 요청 내용으로 응답을 고르는 [route]나 고정 응답 [respond]를 둔다.
+ * 둘 다 없는 path는 404다.
+ * 받은 요청은 [requests]에 path별로 남는다.
  */
 class TestStubServer : AutoCloseable {
-    private val queuedResponses = ConcurrentHashMap<String, ConcurrentLinkedQueue<TestStubResponse>>()
-    private val fixedResponses = ConcurrentHashMap<String, TestStubResponse>()
+    private val routes = ConcurrentHashMap<String, (TestStubRequest) -> TestStubResponse>()
+    private val recorded = ConcurrentHashMap<String, MutableList<TestStubRequest>>()
 
     private val server: DisposableServer = HttpServer.create()
         // OS가 고르는 빈 포트
         .port(0)
         .handle { request, response ->
-            // 응답 조회 키(query 제외 path)
-            val path = request.uri().substringBefore("?")
-            paths += path
-            val stubResponse = queuedResponses[path]?.poll()
-                ?: fixedResponses[path]
-                ?: NOT_FOUND
-            response.status(HttpResponseStatus.valueOf(stubResponse.statusCode))
-            stubResponse.headers.forEach { (name, value) -> response.header(name, value) }
-            response.header(HttpHeaderNames.CONTENT_TYPE, "application/json")
+            val decoder = QueryStringDecoder(request.uri())
             request.receive().aggregate().asString().defaultIfEmpty("")
-                .doOnNext { body -> bodies.getOrPut(path) { Collections.synchronizedList(mutableListOf()) } += body }
-                .then(response.sendString(Mono.just(stubResponse.body)).then())
+                .map { body ->
+                    TestStubRequest(
+                        path = decoder.path(),
+                        queryParameters = decoder.parameters().mapValues { (_, values) -> values.first() },
+                        body = body
+                    )
+                }
+                .flatMap { stubRequest ->
+                    recorded.getOrPut(stubRequest.path) { Collections.synchronizedList(mutableListOf()) } += stubRequest
+                    val stubResponse = routes[stubRequest.path]?.invoke(stubRequest) ?: NOT_FOUND
+                    response.status(HttpResponseStatus.valueOf(stubResponse.statusCode))
+                    stubResponse.headers.forEach { (name, value) -> response.header(name, value) }
+                    response.header(HttpHeaderNames.CONTENT_TYPE, stubResponse.contentType)
+                    response.sendString(Mono.just(stubResponse.body)).then()
+                }
         }
         .bindNow()
 
     val port: Int = server.port()
     val baseUrl: String = "http://localhost:$port"
-    val paths: MutableList<String> = Collections.synchronizedList(mutableListOf())
-    val bodies: MutableMap<String, MutableList<String>> = ConcurrentHashMap()
 
-    /** 한 번만 쓰이는 응답을 path의 큐 뒤에 붙인다. */
-    fun enqueue(path: String, response: TestStubResponse) {
-        queuedResponses.getOrPut(path) { ConcurrentLinkedQueue() } += response
+    /** [path]의 요청마다 [responder]가 응답을 만든다. */
+    fun route(path: String, responder: (TestStubRequest) -> TestStubResponse) {
+        routes[path] = responder
     }
 
-    /** 큐가 비었을 때 계속 돌려줄 응답을 둔다. */
+    /** [path]에 늘 같은 응답을 돌려준다. */
     fun respond(path: String, response: TestStubResponse) {
-        fixedResponses[path] = response
+        route(path) { response }
     }
 
-    fun requestCount(path: String): Int {
-        return synchronized(paths) { paths.count { it == path } }
-    }
-
-    /** 응답 큐·고정 응답·요청 기록을 전부 비운다. */
-    fun reset() {
-        queuedResponses.clear()
-        fixedResponses.clear()
-        paths.clear()
-        bodies.clear()
+    /** [path]로 받은 요청을 받은 순서대로 돌려준다. */
+    fun requests(path: String): List<TestStubRequest> {
+        val requests = recorded[path] ?: return emptyList()
+        return synchronized(requests) { requests.toList() }
     }
 
     override fun close() {

@@ -43,12 +43,12 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         repeat(2) { delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
 
-        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
         assertEquals(MODEL.provider, blocked.failure.provider)
-        assertEquals(2, delegate.summarizeCallCount)
+        assertEquals(2, delegate.summarizeStoryCallCount)
         assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.state)
     }
 
@@ -65,10 +65,10 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         repeat(2) { delegate.failures += AiTestFixture.llmProviderException(code) }
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         // cooldown 경과(rate limit은 쉬는 동안 회로에 닿지 않음)
         clock.advance(DEFAULT_COOLDOWN)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.state)
     }
@@ -80,11 +80,11 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         repeat(5) { delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_INVALID_RESPONSE) }
 
-        repeat(5) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        repeat(5) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
-        assertEquals(6, delegate.summarizeCallCount)
+        assertEquals(6, delegate.summarizeStoryCallCount)
     }
 
     @ParameterizedTest
@@ -101,7 +101,7 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += AiTestFixture.llmProviderException(code)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
         assertEquals(0, circuitBreaker.metrics.numberOfFailedCalls)
@@ -113,7 +113,7 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         val until = AiTestFixture.NOW.plus(REPROBE_AFTER)
         assertEquals("model-hold(code=LLM_MODEL_NOT_FOUND, until=$until)", provider.exclusionReason(clock.instant()))
@@ -128,13 +128,13 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(REPROBE_AFTER)
-        val reprobe = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val reprobe = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_MODEL_NOT_FOUND, reprobe.failure.code)
-        assertEquals(2, delegate.summarizeCallCount)
+        assertEquals(2, delegate.summarizeStoryCallCount)
         assertEquals(clock.instant().plus(REPROBE_AFTER), provider.status(clock.instant()).hold?.until)
         assertBlocked(provider, expectedCalls = 2)
     }
@@ -144,13 +144,13 @@ class GuardedLlmModelTest {
     fun reprobeSuccessClearsHold() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(REPROBE_AFTER)
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(3, delegate.summarizeCallCount)
+        assertEquals(3, delegate.summarizeStoryCallCount)
         assertNull(provider.status(clock.instant()).hold)
     }
 
@@ -166,21 +166,21 @@ class GuardedLlmModelTest {
         val other = guarded(delegate = otherDelegate, model = OTHER_PROVIDER_MODEL, circuitBreaker = wideCircuitBreaker(OTHER_PROVIDER_MODEL))
         delegate.failures += AiTestFixture.llmProviderException(code)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         val until = AiTestFixture.NOW.plus(REPROBE_AFTER)
         val reason = "provider-hold(code=${code.code}, until=$until)"
         assertEquals(reason, provider.exclusionReason(clock.instant()))
         assertEquals(reason, sibling.exclusionReason(clock.instant()))
-        val blocked = assertFailsWith<LlmProviderException> { sibling.summarizeNews(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { sibling.summarizeStory(KEYWORDS, null, ARTICLES) }
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
-        assertEquals(0, siblingDelegate.summarizeCallCount)
-        other.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(1, otherDelegate.summarizeCallCount)
+        assertEquals(0, siblingDelegate.summarizeStoryCallCount)
+        other.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(1, otherDelegate.summarizeStoryCallCount)
 
         clock.advance(REPROBE_AFTER)
-        sibling.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(1, siblingDelegate.summarizeCallCount)
+        sibling.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(1, siblingDelegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -188,7 +188,7 @@ class GuardedLlmModelTest {
     fun extendProviderHoldOnlyForward() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_PAYMENT_REQUIRED)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         val first = provider.status(clock.instant()).hold
 
         providerHolds.hold(MODEL.provider, LlmFailureCode.LLM_FORBIDDEN, AiTestFixture.NOW.plusSeconds(1))
@@ -202,10 +202,10 @@ class GuardedLlmModelTest {
         val circuitBreaker = circuitBreaker()
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         val bufferedCalls = circuitBreaker.metrics.numberOfBufferedCalls
 
-        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
 
         assertEquals(bufferedCalls, circuitBreaker.metrics.numberOfBufferedCalls)
         assertEquals(0, circuitBreaker.metrics.numberOfNotPermittedCalls)
@@ -217,7 +217,7 @@ class GuardedLlmModelTest {
     fun statusPrefersProviderHold() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         clock.advance(Duration.ofMinutes(1))
         providerHolds.hold(MODEL.provider, LlmFailureCode.LLM_FORBIDDEN, clock.instant().plus(REPROBE_AFTER))
 
@@ -233,17 +233,17 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_MODEL_NOT_FOUND)
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_PAYMENT_REQUIRED)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         provider.reset()
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         assertNotNull(providerHolds.holdOf(MODEL.provider, clock.instant()))
 
         provider.reset()
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertNull(provider.status(clock.instant()).hold)
         assertNull(providerHolds.holdOf(MODEL.provider, clock.instant()))
-        assertEquals(3, delegate.summarizeCallCount)
+        assertEquals(3, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -254,7 +254,7 @@ class GuardedLlmModelTest {
         repeat(5) { delegate.failures += IllegalStateException("boom") }
 
         repeat(5) {
-            assertFailsWith<IllegalStateException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+            assertFailsWith<IllegalStateException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         }
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
@@ -266,7 +266,7 @@ class GuardedLlmModelTest {
         val circuitBreaker = circuitBreaker()
         val provider = guarded(circuitBreaker = circuitBreaker)
 
-        val result = provider.summarizeNews(KEYWORD, ARTICLES)
+        val result = provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(MODEL.qualifiedCode, result.metadata.model)
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
@@ -279,8 +279,8 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
-        repeat(3) { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
+        repeat(3) { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
     }
@@ -291,10 +291,10 @@ class GuardedLlmModelTest {
         val circuitBreaker = circuitBreaker()
         val provider = guarded(circuitBreaker = circuitBreaker)
         repeat(2) { delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
-        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
         val failedCalls = circuitBreaker.metrics.numberOfFailedCalls
 
-        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
 
         assertEquals(3, circuitBreaker.metrics.numberOfNotPermittedCalls)
         assertEquals(failedCalls, circuitBreaker.metrics.numberOfFailedCalls)
@@ -308,12 +308,12 @@ class GuardedLlmModelTest {
         openCircuit(provider)
         circuitBreaker.transitionToHalfOpenState()
         repeat(2) { delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
-        val callsBeforeProbe = delegate.summarizeCallCount
+        val callsBeforeProbe = delegate.summarizeStoryCallCount
 
-        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
-        assertEquals(2, delegate.summarizeCallCount - callsBeforeProbe)
+        assertEquals(2, delegate.summarizeStoryCallCount - callsBeforeProbe)
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
     }
 
@@ -327,18 +327,18 @@ class GuardedLlmModelTest {
         val gate = CompletableDeferred<Unit>()
         delegate.gate = gate
 
-        val callsBefore = delegate.summarizeCallCount
+        val callsBefore = delegate.summarizeStoryCallCount
 
-        val probe = async { provider.summarizeNews(KEYWORD, ARTICLES) }
-        while (delegate.summarizeCallCount == callsBefore) {
+        val probe = async { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
+        while (delegate.summarizeStoryCallCount == callsBefore) {
             yield()
         }
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         gate.complete(Unit)
         probe.await()
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
-        assertEquals(1, delegate.summarizeCallCount - callsBefore)
+        assertEquals(1, delegate.summarizeStoryCallCount - callsBefore)
     }
 
     @Test
@@ -349,7 +349,7 @@ class GuardedLlmModelTest {
         openCircuit(provider)
         circuitBreaker.transitionToHalfOpenState()
 
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
     }
@@ -363,7 +363,7 @@ class GuardedLlmModelTest {
         circuitBreaker.transitionToHalfOpenState()
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.state)
     }
@@ -377,7 +377,7 @@ class GuardedLlmModelTest {
         circuitBreaker.transitionToHalfOpenState()
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_INVALID_RESPONSE)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
     }
@@ -388,15 +388,15 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         assertBlocked(provider, expectedCalls = 1)
 
         clock.advance(Duration.ofSeconds(29))
         assertBlocked(provider, expectedCalls = 1)
 
         clock.advance(Duration.ofSeconds(1))
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(2, delegate.summarizeCallCount)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(2, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -405,14 +405,14 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = null)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(DEFAULT_COOLDOWN.minusSeconds(1))
         assertBlocked(provider, expectedCalls = 1)
 
         clock.advance(Duration.ofSeconds(1))
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(2, delegate.summarizeCallCount)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(2, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -421,14 +421,14 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = MAX_COOLDOWN.plusHours(1).toMillis())
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(MAX_COOLDOWN.minusSeconds(1))
         assertBlocked(provider, expectedCalls = 1)
 
         clock.advance(Duration.ofSeconds(1))
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(2, delegate.summarizeCallCount)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(2, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -437,10 +437,10 @@ class GuardedLlmModelTest {
         val circuitBreaker = circuitBreaker()
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         val bufferedCalls = circuitBreaker.metrics.numberOfBufferedCalls
 
-        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(3) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
 
         assertEquals(bufferedCalls, circuitBreaker.metrics.numberOfBufferedCalls)
         assertEquals(0, circuitBreaker.metrics.numberOfNotPermittedCalls)
@@ -452,13 +452,13 @@ class GuardedLlmModelTest {
     fun resumeAfterCooldown() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(Duration.ofSeconds(30))
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(3, delegate.summarizeCallCount)
+        assertEquals(3, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -467,10 +467,10 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(2, delegate.summarizeCallCount)
+        assertEquals(2, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -482,9 +482,9 @@ class GuardedLlmModelTest {
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 60_000)
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 10_000)
 
-        val first = async { runCatching { provider.summarizeNews(KEYWORD, ARTICLES) } }
-        val second = async { runCatching { provider.summarizeNews(KEYWORD, ARTICLES) } }
-        while (delegate.summarizeCallCount < 2) {
+        val first = async { runCatching { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
+        val second = async { runCatching { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
+        while (delegate.summarizeStoryCallCount < 2) {
             yield()
         }
         gate.complete(Unit)
@@ -518,7 +518,7 @@ class GuardedLlmModelTest {
     fun unavailableWhileCoolingDown() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertFalse(provider.isLikelyAvailable(clock.instant()))
 
@@ -543,7 +543,7 @@ class GuardedLlmModelTest {
         val provider = guarded()
         openCircuit(provider)
 
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
         assertEquals(MODEL.provider, blocked.failure.provider)
@@ -572,7 +572,7 @@ class GuardedLlmModelTest {
         val thrown = AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
         delegate.failures += thrown
 
-        val caught = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val caught = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertSame(thrown, caught)
     }
@@ -584,14 +584,14 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += CancellationException("cancelled")
 
-        assertFailsWith<CancellationException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<CancellationException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(0, circuitBreaker.metrics.numberOfSuccessfulCalls)
         assertEquals(0, circuitBreaker.metrics.numberOfFailedCalls)
         assertEquals(0, circuitBreaker.metrics.numberOfBufferedCalls)
 
-        provider.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(2, delegate.summarizeCallCount)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(2, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -599,7 +599,7 @@ class GuardedLlmModelTest {
     fun prepareReturnsDelegatePlan() {
         val provider = guarded()
 
-        assertEquals(delegate.prepareNewsSummary().plan, provider.prepareNewsSummary().plan)
+        assertEquals(delegate.prepareStorySummary().plan, provider.prepareStorySummary().plan)
     }
 
     @Test
@@ -608,21 +608,21 @@ class GuardedLlmModelTest {
         val provider = guarded()
         openCircuit(provider)
 
-        assertEquals(MODEL.provider, provider.prepareNewsSummary().plan.provider)
+        assertEquals(MODEL.provider, provider.prepareStorySummary().plan.provider)
     }
 
     @Test
     @DisplayName("요약 준비가 돌려준 실행 단위도 같은 차단을 받는다")
     fun preparedSummaryIsGuarded() = runBlocking {
         val provider = guarded()
-        val prepared = provider.prepareNewsSummary()
+        val prepared = provider.prepareStorySummary()
         openCircuit(provider)
-        val callsBefore = delegate.summarizeCallCount
+        val callsBefore = delegate.summarizeStoryCallCount
 
-        val blocked = assertFailsWith<LlmProviderException> { prepared.summarize(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { prepared.summarize(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
-        assertEquals(callsBefore, delegate.summarizeCallCount)
+        assertEquals(callsBefore, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -630,10 +630,10 @@ class GuardedLlmModelTest {
     fun preparedSummaryDelegatesWhenNotBlocked() = runBlocking {
         val provider = guarded()
 
-        val result = provider.prepareNewsSummary().summarize(KEYWORD, ARTICLES)
+        val result = provider.prepareStorySummary().summarize(KEYWORDS, null, ARTICLES)
 
         assertEquals(MODEL.qualifiedCode, result.metadata.model)
-        assertEquals(1, delegate.summarizeCallCount)
+        assertEquals(1, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -643,10 +643,10 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         circuitBreaker.transitionToForcedOpenState()
 
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
-        assertEquals(0, delegate.summarizeCallCount)
+        assertEquals(0, delegate.summarizeStoryCallCount)
         assertEquals("forced-open", provider.exclusionReason(clock.instant()))
         assertFalse(provider.isLikelyAvailable(clock.instant()))
     }
@@ -674,7 +674,7 @@ class GuardedLlmModelTest {
         assertNull(provider.exclusionReason(clock.instant()))
 
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
         assertEquals(
             "cooldown(until=${AiTestFixture.NOW.plusSeconds(30)})",
             provider.exclusionReason(clock.instant())
@@ -697,7 +697,7 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.callDelay = Duration.ofMillis(30)
 
-        repeat(2) { provider.summarizeNews(KEYWORD, ARTICLES) }
+        repeat(2) { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.state)
         assertEquals(2, circuitBreaker.metrics.numberOfSlowCalls)
@@ -713,9 +713,9 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
 
         delegate.callDelay = Duration.ofMillis(30)
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
         delegate.callDelay = Duration.ZERO
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
         assertEquals(1, circuitBreaker.metrics.numberOfSlowCalls)
@@ -731,7 +731,7 @@ class GuardedLlmModelTest {
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.callDelay = Duration.ofMillis(30)
 
-        val result = provider.summarizeNews(KEYWORD, ARTICLES)
+        val result = provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(MODEL.qualifiedCode, result.metadata.model)
     }
@@ -740,9 +740,9 @@ class GuardedLlmModelTest {
     @DisplayName("상태 스냅샷은 회로 상태와 쉬는 시각, 집계를 함께 담는다")
     fun statusSnapshot() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         val status = provider.status(clock.instant())
 
@@ -759,7 +759,7 @@ class GuardedLlmModelTest {
     fun statusDropsExpiredCooldown() = runBlocking {
         val provider = guarded(circuitBreaker = wideCircuitBreaker())
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         clock.advance(Duration.ofSeconds(30))
 
@@ -774,16 +774,16 @@ class GuardedLlmModelTest {
         // 회로 open과 cooldown이 동시에 걸리는 실패 순서(마지막이 rate limit)
         delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
         assertEquals(CircuitBreaker.State.OPEN, circuitBreaker.state)
-        val callsBefore = delegate.summarizeCallCount
+        val callsBefore = delegate.summarizeStoryCallCount
 
         provider.reset()
-        provider.summarizeNews(KEYWORD, ARTICLES)
+        provider.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(CircuitBreaker.State.CLOSED, circuitBreaker.state)
         assertNull(provider.status(clock.instant()).cooldownUntil)
-        assertEquals(callsBefore + 1, delegate.summarizeCallCount)
+        assertEquals(callsBefore + 1, delegate.summarizeStoryCallCount)
     }
 
     @Test
@@ -792,7 +792,7 @@ class GuardedLlmModelTest {
         val circuitBreaker = wideCircuitBreaker()
         val provider = guarded(circuitBreaker = circuitBreaker)
         delegate.failures += AiTestFixture.rateLimitedException(retryAfterMillis = 30_000)
-        assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         provider.reset()
 
@@ -805,7 +805,7 @@ class GuardedLlmModelTest {
         delegate: NamedLlmProviderPort = this.delegate
     ) {
         repeat(2) { delegate.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
-        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) } }
+        repeat(2) { assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) } }
     }
 
     /** 실패율로는 열리지 않는 회로를 만든다. */
@@ -813,10 +813,10 @@ class GuardedLlmModelTest {
         circuitBreaker(slidingWindowSize = 8, minimumNumberOfCalls = 8, model = model)
 
     private suspend fun assertBlocked(provider: GuardedLlmModel, expectedCalls: Int) {
-        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeNews(KEYWORD, ARTICLES) }
+        val blocked = assertFailsWith<LlmProviderException> { provider.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, blocked.failure.code)
-        assertEquals(expectedCalls, delegate.summarizeCallCount)
+        assertEquals(expectedCalls, delegate.summarizeStoryCallCount)
     }
 
     private fun guarded(
@@ -868,7 +868,8 @@ class GuardedLlmModelTest {
         val OTHER_PROVIDER_MODEL: LlmModel = LlmModel.entries.first { it.provider != MODEL.provider }
         val REPROBE_AFTER: Duration = Duration.ofHours(1)
         val KEYWORD: AiKeyword = AiTestFixture.keyword()
-        val ARTICLES = listOf(AiTestFixture.newsArticle())
+        val KEYWORDS: List<AiKeyword> = listOf(KEYWORD)
+        val ARTICLES = listOf(AiTestFixture.storySummaryArticle())
         val DEFAULT_COOLDOWN: Duration = Duration.ofSeconds(60)
         val MAX_COOLDOWN: Duration = Duration.ofMinutes(10)
     }

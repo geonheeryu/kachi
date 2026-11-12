@@ -3,11 +3,9 @@ package me.rgunny.kachi.ai.fake
 import me.rgunny.kachi.ai.adapter.outbound.llm.LlmProviderCandidate
 import me.rgunny.kachi.ai.application.exception.LlmProviderException
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmKeywordExpansionResult
-import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmNewsSummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.LlmStorySummaryResult
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.PreviousStorySummary
 import me.rgunny.kachi.ai.application.port.outbound.llm.model.StorySummaryArticle
-import me.rgunny.kachi.ai.application.port.outbound.news.model.NewsArticle
 import me.rgunny.kachi.ai.domain.keyword.AiKeyword
 import me.rgunny.kachi.ai.domain.llm.LlmFailure
 import me.rgunny.kachi.ai.domain.llm.LlmFailureCode
@@ -37,15 +35,6 @@ class FakeLlmProviderCandidate(
         rejectIfBlocked()
 
         return super.expandKeyword(keyword, maxExpansions)
-    }
-
-    override suspend fun summarizeNews(
-        keyword: AiKeyword,
-        articles: List<NewsArticle>
-    ): LlmNewsSummaryResult {
-        rejectIfBlocked()
-
-        return super.summarizeNews(keyword, articles)
     }
 
     override suspend fun summarizeStory(

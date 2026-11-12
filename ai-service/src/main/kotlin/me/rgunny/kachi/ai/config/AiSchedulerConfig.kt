@@ -1,7 +1,6 @@
 package me.rgunny.kachi.ai.config
 
 import me.rgunny.kachi.ai.adapter.inbound.scheduler.AiKeywordExpansionSchedulerSettings
-import me.rgunny.kachi.ai.adapter.inbound.scheduler.AiNewsSummarySchedulerSettings
 import me.rgunny.kachi.ai.adapter.inbound.scheduler.AiStorySummarySchedulerSettings
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -21,20 +20,6 @@ class AiSchedulerConfig {
             fixedDelay = properties.fixedDelay,
             initialDelay = properties.initialDelay,
             maxExpansionsPerKeyword = properties.maxExpansionsPerKeyword
-        )
-    }
-
-    @Bean
-    fun aiNewsSummarySchedulerSettings(
-        properties: AiNewsSummarySchedulerProperties
-    ): AiNewsSummarySchedulerSettings {
-        return AiNewsSummarySchedulerSettings(
-            enabled = properties.enabled,
-            fixedDelay = properties.fixedDelay,
-            initialDelay = properties.initialDelay,
-            overlap = properties.overlap,
-            maxLookback = properties.maxLookback,
-            maxArticlesPerKeyword = properties.maxArticlesPerKeyword
         )
     }
 

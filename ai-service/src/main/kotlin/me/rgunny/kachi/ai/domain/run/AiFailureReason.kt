@@ -22,9 +22,5 @@ enum class AiFailureReason {
     /** 제공자 계정 문제. */
     ACCOUNT_ERROR,
 
-    /**
-     * 요약 대상 뉴스가 없었던 실패. skip으로 분리해(ADR 021) 새 실행은 이 값을 쓰지 않고, 이전 실행 기록을 읽기 위해 남긴다.
-     */
-    EMPTY_INPUT,
     UNKNOWN
 }

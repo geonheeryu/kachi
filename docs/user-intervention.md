@@ -15,6 +15,7 @@
 ## 1. `.env`·`.env.<profile>`의 실제 값
 
 - [ ] `.env.example`의 키 목록대로 실제 값을 넣는다. 키 목록은 `.env.example`이 기준이고, 읽는 순서는 루트 README 6장에 있다.
+- [ ] `.env`·`.env.local`에서 `KACHI_COLLECTOR_SERVICE_BASE_URL` 줄을 지운다. ai-service는 collector-service를 호출하지 않아 이 키를 읽는 설정이 없다.
 
 값은 모두 외부 서비스 계정에서 발급받는다. OAuth 클라이언트(Google, Kakao), 뉴스 provider(Naver, Finnhub), LLM provider(OpenRouter, Groq, Together, Cerebras, Mistral), 알림 채널(Slack·Discord 웹훅, Telegram 봇 토큰과 chat id), JWT secret과 바인딩 키가 해당한다. 에이전트는 `.env.example`과 `scripts/`만 작성하고 실제 값은 넣지 않는다(`AGENTS.md` 작업 방식). 전역 훅이 `.env*` 편집을 막는다.
 

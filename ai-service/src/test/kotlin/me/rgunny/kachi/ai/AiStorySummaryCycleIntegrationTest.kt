@@ -15,9 +15,13 @@ import me.rgunny.kachi.ai.adapter.outbound.persistence.summary.StorySummaryMongo
 import me.rgunny.kachi.ai.application.port.inbound.outbox.RelayAiOutboxUseCase
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderAdminPort
 import me.rgunny.kachi.ai.contract.AiDevelopmentKind
+import me.rgunny.kachi.ai.contract.AiStoryQuarantinedEvent
 import me.rgunny.kachi.ai.contract.AiStorySplitRequestedEvent
-import me.rgunny.kachi.ai.contract.AiSummaryCreatedEventV2
+import me.rgunny.kachi.ai.contract.AiSummaryCreatedEvent
 import me.rgunny.kachi.ai.domain.llm.LlmModel
+import me.rgunny.kachi.ai.domain.outbox.AiOutboxClaim
+import me.rgunny.kachi.ai.domain.outbox.AiOutboxStatus
+import me.rgunny.kachi.ai.domain.quarantine.StoryQuarantineStatus
 import me.rgunny.kachi.ai.fixture.AiTestFixture
 import me.rgunny.kachi.ai.support.AiOutboxCollection
 import me.rgunny.kachi.ai.support.TestLlmServer
@@ -53,11 +57,10 @@ import tools.jackson.databind.json.JsonMapper
 @SpringBootTest(
     properties = [
         "kachi.ai.events.enabled=true",
-        "kachi.ai.story-summary.events-enabled=true",
         "kachi.ai.story-summary.min-new-articles=3",
         "kachi.ai.outbox.relay.enabled=true",
         "kachi.ai.outbox.relay.initial-delay=1h",
-        "kachi.ai.scheduler.news-summary.initial-delay=1h"
+        "kachi.ai.story-quarantine.failure-threshold=2"
     ]
 )
 @Import(AiServiceTestContainersConfig::class)
@@ -108,6 +111,9 @@ class AiStorySummaryCycleIntegrationTest {
         assertEquals(1, summary.version)
         assertEquals(3, summary.sourceNewsCount)
         assertEquals(1, llm.requests.size)
+        // 요청과 다른 이름으로 답하는 stub(응답이 보고한 모델과 요청한 모델을 각각 저장)
+        assertEquals("test-model", summary.model)
+        assertEquals(MODEL.code, summary.requestedModel)
         assertEquals(
             0,
             mongoTemplate.findAll(AiStoryArticleMongoDocument::class.java).collectList().block()!!
@@ -116,15 +122,17 @@ class AiStorySummaryCycleIntegrationTest {
 
         val relayed = relayUseCase.relay()
         assertEquals(1, relayed.published)
+        assertEquals(AiOutboxStatus.PUBLISHED.name, outboxCollection.findAll().single().status)
         val record = recordsOf(AiTestFixture.EVENT_TOPIC_SUMMARY_CREATED, key = storyId.toString(), expected = 1).single()
-        val event = jsonMapper.readValue(record.value(), AiSummaryCreatedEventV2::class.java)
-        assertEquals(AiSummaryCreatedEventV2.CURRENT_SCHEMA_VERSION, event.schemaVersion)
+        val event = jsonMapper.readValue(record.value(), AiSummaryCreatedEvent::class.java)
+        assertEquals(AiSummaryCreatedEvent.CURRENT_SCHEMA_VERSION, event.schemaVersion)
         assertEquals(storyId.toString(), event.storyId)
         assertEquals(1, event.version)
         assertEquals(listOf("nvidia", "gpu"), event.keywords)
         assertEquals(AiDevelopmentKind.DEVELOPMENT, event.developmentKind)
         assertEquals("NVIDIA 사건 요약", event.title)
         assertEquals(3, event.sourceNewsCount)
+        assertEquals(MODEL.provider.code, event.provider)
     }
 
     @Test
@@ -182,6 +190,62 @@ class AiStorySummaryCycleIntegrationTest {
     }
 
     @Test
+    @DisplayName("story 탓 실패가 임계치에 닿으면 격리 이벤트가 broker에 발행된다")
+    fun publishStoryQuarantinedEvent() = runBlocking {
+        val storyId = UUID.randomUUID()
+        llm.enqueueClientError()
+        llm.enqueueClientError()
+
+        publishAttached(storyId, count = 3, keywords = listOf("nvidia"))
+        awaitCondition("첫 실패 기록") { quarantineOf(storyId)?.consecutiveFailures == 1 }
+        publishAttached(storyId, count = 1, keywords = listOf("nvidia"), startIndex = 3)
+        awaitCondition("격리 전이") { quarantineOf(storyId)?.status == StoryQuarantineStatus.QUARANTINED }
+
+        val relayed = relayUseCase.relay()
+        assertEquals(2, llm.requests.size)
+        assertEquals(1, relayed.published)
+        val record = recordsOf(AiTestFixture.EVENT_TOPIC_STORY_QUARANTINED, key = storyId.toString(), expected = 1).single()
+        val event = jsonMapper.readValue(record.value(), AiStoryQuarantinedEvent::class.java)
+        assertEquals(AiStoryQuarantinedEvent.CURRENT_SCHEMA_VERSION, event.schemaVersion)
+        assertEquals(storyId.toString(), event.storyId)
+        assertEquals(2, event.consecutiveFailures)
+    }
+
+    @Test
+    @DisplayName("발행 중에 멈춘 행은 회수되어 broker까지 간다")
+    fun recoverStalePublishingRow() = runBlocking {
+        val key = UUID.randomUUID().toString()
+        val payload = """{"schemaVersion":2,"storyId":"$key"}"""
+        val staleClaimedAt = Instant.now().minus(Duration.ofMinutes(10))
+        outboxCollection.insert(
+            AiTestFixture.restoredOutbox(
+                eventKey = key,
+                partitionKey = key,
+                payload = payload,
+                status = AiOutboxStatus.PUBLISHING,
+                claim = AiOutboxClaim(claimedBy = "dead-publisher", claimedAt = staleClaimedAt),
+                nextRetryAt = staleClaimedAt,
+                createdAt = staleClaimedAt
+            )
+        )
+
+        val first = relayUseCase.relay()
+        assertEquals(1, first.staleRecovered)
+        // 회수가 실패 1회로 기록되어 붙는 재시도 backoff(지날 때까지 tick 반복)
+        var published = first.published
+        val deadline = Instant.now().plus(POLL_TIMEOUT)
+        while (published == 0 && Instant.now().isBefore(deadline)) {
+            delay(500)
+            published += relayUseCase.relay().published
+        }
+        assertEquals(1, published)
+
+        assertEquals(AiOutboxStatus.PUBLISHED.name, outboxCollection.findAll().single().status)
+        val record = recordsOf(AiTestFixture.EVENT_TOPIC_SUMMARY_CREATED, key = key, expected = 1).single()
+        assertEquals(payload, record.value())
+    }
+
+    @Test
     @DisplayName("계약에 맞지 않는 메시지는 재시도 없이 DLT로 간다")
     fun sendInvalidMessageToDlt() = runBlocking {
         val key = UUID.randomUUID().toString()
@@ -218,6 +282,11 @@ class AiStorySummaryCycleIntegrationTest {
                 jsonMapper.writeValueAsString(event)
             ).get()
         }
+    }
+
+    private fun quarantineOf(storyId: UUID): StoryQuarantineMongoDocument? {
+        return mongoTemplate.findAll(StoryQuarantineMongoDocument::class.java).collectList().block()!!
+            .singleOrNull { it.storyId == storyId }
     }
 
     private suspend fun awaitSummary(storyId: UUID): StorySummaryMongoDocument {

@@ -21,12 +21,13 @@ class NotificationRoutingPropertiesTest {
                 "kachi.notification.routing.request-topic" to "notification.requested",
                 "kachi.notification.routing.auto-offset-reset" to "earliest",
                 "kachi.notification.routing.topics.summary-created" to "ai.summary.created",
-                "kachi.notification.routing.topics.keyword-quarantined" to "ai.keyword.quarantined",
+                "kachi.notification.routing.topics.story-quarantined" to "ai.story.quarantined",
                 "kachi.notification.routing.dlt.topic" to "notification.routing.dlt",
                 "kachi.notification.routing.retry.max-attempts" to "3",
                 "kachi.notification.routing.retry.backoff" to "1s",
                 "kachi.notification.routing.user-service.base-url" to "http://localhost:8080",
-                "kachi.notification.routing.user-service.subscriptions-path" to "/api/v1/internal/subscriptions",
+                "kachi.notification.routing.user-service.recipients-search-path" to "/api/v1/internal/subscriptions/recipients/search",
+                "kachi.notification.routing.user-service.page-size" to "100",
                 "kachi.notification.routing.user-service.users-path" to "/api/v1/internal/users",
                 "kachi.notification.routing.user-service.timeout" to "3s",
                 "kachi.notification.routing.user-service.max-in-memory-size" to "262144",
@@ -41,12 +42,13 @@ class NotificationRoutingPropertiesTest {
         assertEquals("notification.requested", properties.requestTopic)
         assertEquals("earliest", properties.autoOffsetReset)
         assertEquals("ai.summary.created", properties.topics.summaryCreated)
-        assertEquals("ai.keyword.quarantined", properties.topics.keywordQuarantined)
+        assertEquals("ai.story.quarantined", properties.topics.storyQuarantined)
         assertEquals("notification.routing.dlt", properties.dlt.topic)
         assertEquals(3, properties.retry.maxAttempts)
         assertEquals(Duration.ofSeconds(1), properties.retry.backoff)
         assertEquals("http://localhost:8080", properties.userService.baseUrl)
-        assertEquals("/api/v1/internal/subscriptions", properties.userService.subscriptionsPath)
+        assertEquals("/api/v1/internal/subscriptions/recipients/search", properties.userService.recipientsSearchPath)
+        assertEquals(100, properties.userService.pageSize)
         assertEquals("/api/v1/internal/users", properties.userService.usersPath)
         assertEquals(Duration.ofSeconds(3), properties.userService.timeout)
         assertEquals(262144, properties.userService.maxInMemorySize)
@@ -59,14 +61,23 @@ class NotificationRoutingPropertiesTest {
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(requestTopic = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(autoOffsetReset = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(summaryCreatedTopic = "") }
-        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(keywordQuarantinedTopic = " ") }
+        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(storyQuarantinedTopic = " ") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(dltTopic = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(maxAttempts = 0) }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(backoff = Duration.ZERO) }
-        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(subscriptionsPath = "") }
+        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(recipientsSearchPath = "") }
+        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(pageSize = 0) }
+        assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(pageSize = 101) }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(usersPath = "") }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(timeout = Duration.ZERO) }
         assertFailsWith<IllegalArgumentException> { RoutingTestFixture.properties(maxInMemorySize = 0) }
+    }
+
+    @Test
+    @DisplayName("page-size는 1과 user-service 상한 100을 허용한다")
+    fun acceptPageSizeBounds() {
+        assertEquals(1, RoutingTestFixture.properties(pageSize = 1).userService.pageSize)
+        assertEquals(100, RoutingTestFixture.properties(pageSize = 100).userService.pageSize)
     }
 
     @Test

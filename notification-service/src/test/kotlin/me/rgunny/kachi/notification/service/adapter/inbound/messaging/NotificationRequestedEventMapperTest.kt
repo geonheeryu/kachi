@@ -37,17 +37,32 @@ class NotificationRequestedEventMapperTest {
     @DisplayName("계약의 origin을 NotificationOrigin으로 옮긴다")
     fun toCommandWithOrigin() {
         val event = NotificationRequestedEvent(
-            requestId = "sum:summary-1:u:user-1:c:SLACK",
+            requestId = "sum:story-1:2:u:user-1:c:SLACK",
             requester = "notification-routing",
             channel = me.rgunny.kachi.notification.contract.NotificationChannel.SLACK,
             recipientId = "user-1",
             message = "hello",
-            origin = NotificationRequestedOrigin(summaryId = "summary-1", keyword = "tesla", userId = "user-1"),
+            origin = NotificationRequestedOrigin(
+                summaryId = "summary-1",
+                storyId = "story-1",
+                version = 2,
+                keywords = listOf("tesla", "nvidia"),
+                userId = "user-1",
+            ),
         )
 
         val command = NotificationRequestedEventMapper.toCommand(event)
 
-        assertEquals(NotificationOrigin("summary-1", "tesla", "user-1"), command.origin)
+        assertEquals(
+            NotificationOrigin(
+                summaryId = "summary-1",
+                storyId = "story-1",
+                version = 2,
+                keywords = listOf("tesla", "nvidia"),
+                userId = "user-1",
+            ),
+            command.origin,
+        )
     }
 
     @Test

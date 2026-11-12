@@ -40,7 +40,7 @@ class RoutingLlmProviderTest {
         val router = router(summary = listOf(third, first, second), expansion = listOf(first))
         listOf(third, first).forEach { it.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(listOf(third.name, first.name, second.name), callLog)
         assertEquals(second.name, result.metadata.model)
@@ -51,7 +51,7 @@ class RoutingLlmProviderTest {
     fun useCandidatesOfEachUse() = runBlocking {
         val router = router(summary = listOf(first), expansion = listOf(third))
 
-        router.summarizeNews(KEYWORD, ARTICLES)
+        router.summarizeStory(KEYWORDS, null, ARTICLES)
         router.expandKeyword(KEYWORD, 3)
 
         assertEquals(listOf(first.name, third.name), callLog)
@@ -61,12 +61,11 @@ class RoutingLlmProviderTest {
     @DisplayName("후보가 없는 용도가 있으면 생성할 수 없다")
     fun failWhenAnyUseHasNoCandidates() {
         assertFailsWith<IllegalArgumentException> {
-            RoutingLlmProvider(candidates = mapOf(LlmUse.NEWS_SUMMARY to listOf(first)), clock = clock)
+            RoutingLlmProvider(candidates = mapOf(LlmUse.STORY_SUMMARY to listOf(first)), clock = clock)
         }
         assertFailsWith<IllegalArgumentException> {
             RoutingLlmProvider(
                 candidates = mapOf(
-                    LlmUse.NEWS_SUMMARY to listOf(first),
                     LlmUse.STORY_SUMMARY to listOf(first),
                     LlmUse.KEYWORD_EXPANSION to emptyList()
                 ),
@@ -80,10 +79,10 @@ class RoutingLlmProviderTest {
     fun failoverOnRetryableFailure() = runBlocking {
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(1, first.summarizeCallCount)
-        assertEquals(1, second.summarizeCallCount)
+        assertEquals(1, first.summarizeStoryCallCount)
+        assertEquals(1, second.summarizeStoryCallCount)
         assertEquals(second.name, result.metadata.model)
     }
 
@@ -93,19 +92,19 @@ class RoutingLlmProviderTest {
     fun failoverOnInputFailure(code: LlmFailureCode) = runBlocking {
         first.failures += AiTestFixture.llmProviderException(code)
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(1, first.summarizeCallCount)
+        assertEquals(1, first.summarizeStoryCallCount)
         assertEquals(second.name, result.metadata.model)
     }
 
     @Test
-    @DisplayName("시도한 후보 전부가 입력 탓으로 끝나면 결과 예외가 키워드 탓으로 확정한다")
+    @DisplayName("시도한 후보 전부가 입력 탓으로 끝나면 결과 예외가 입력 탓으로 확정한다")
     fun allInputWhenEveryCandidateFailsByInput() = runBlocking {
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_REQUEST_REJECTED)
         second.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_INVALID_RESPONSE)
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertTrue(failure.allInput)
         assertEquals(LlmFailureCode.LLM_INVALID_RESPONSE, failure.failure.code)
@@ -116,12 +115,12 @@ class RoutingLlmProviderTest {
     }
 
     @Test
-    @DisplayName("일부 후보만 입력 탓이면 키워드 탓으로 확정하지 않는다")
+    @DisplayName("일부 후보만 입력 탓이면 입력 탓으로 확정하지 않는다")
     fun notAllInputWhenOnlySomeCandidatesFailByInput() = runBlocking {
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_INVALID_RESPONSE)
         second.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_SERVER_ERROR)
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertFalse(failure.allInput)
         assertEquals(2, failure.attempts.size)
@@ -133,7 +132,7 @@ class RoutingLlmProviderTest {
         first.blockedBy = OPEN
         second.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_INVALID_RESPONSE)
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(listOf(LlmFailureCode.LLM_INVALID_RESPONSE), failure.attempts.map { it.code })
         assertTrue(failure.allInput)
@@ -150,7 +149,7 @@ class RoutingLlmProviderTest {
     fun failoverOnModelAndProviderFailure(code: LlmFailureCode) = runBlocking {
         first.failures += AiTestFixture.llmProviderException(code)
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(second.name, result.metadata.model)
     }
@@ -160,7 +159,7 @@ class RoutingLlmProviderTest {
     fun failoverOnUnknownFailure() = runBlocking {
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_UNKNOWN_ERROR)
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
         assertEquals(second.name, result.metadata.model)
     }
@@ -170,9 +169,9 @@ class RoutingLlmProviderTest {
     fun propagateNonLlmException() = runBlocking {
         first.failures += IllegalArgumentException("boom")
 
-        assertFailsWith<IllegalArgumentException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<IllegalArgumentException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
-        assertEquals(0, second.summarizeCallCount)
+        assertEquals(0, second.summarizeStoryCallCount)
     }
 
     @Test
@@ -182,9 +181,9 @@ class RoutingLlmProviderTest {
         val router = router(summary = candidates, expansion = candidates)
         candidates.forEach { it.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT) }
 
-        assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
-        candidates.forEach { assertEquals(1, it.summarizeCallCount, "${it.name} must be called once") }
+        candidates.forEach { assertEquals(1, it.summarizeStoryCallCount, "${it.name} must be called once") }
         assertEquals(3, callLog.size)
     }
 
@@ -193,10 +192,10 @@ class RoutingLlmProviderTest {
     fun skipBlockedCandidateWithoutCall() = runBlocking {
         first.blockedBy = OPEN
 
-        val result = router.summarizeNews(KEYWORD, ARTICLES)
+        val result = router.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(0, first.summarizeCallCount)
-        assertEquals(1, second.summarizeCallCount)
+        assertEquals(0, first.summarizeStoryCallCount)
+        assertEquals(1, second.summarizeStoryCallCount)
         assertEquals(second.name, result.metadata.model)
     }
 
@@ -205,12 +204,12 @@ class RoutingLlmProviderTest {
     fun failWithoutCallWhenAllCandidatesAreBlocked() = runBlocking {
         listOf(first, second).forEach { it.blockedBy = OPEN }
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, failure.failure.code)
         assertNull(failure.failure.provider)
         assertFalse(failure.allInput)
-        assertEquals(0, first.summarizeCallCount + second.summarizeCallCount)
+        assertEquals(0, first.summarizeStoryCallCount + second.summarizeStoryCallCount)
         assertEquals(
             "no llm candidate available: ${first.name}=$OPEN, ${second.name}=$OPEN",
             failure.failure.message
@@ -224,7 +223,7 @@ class RoutingLlmProviderTest {
         first.failures += thrown
         second.blockedBy = OPEN
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(thrown.failure, failure.failure)
         assertEquals(thrown, failure.cause)
@@ -236,10 +235,10 @@ class RoutingLlmProviderTest {
         first.blockedBy = OPEN
         second.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_TIMEOUT, failure.failure.code)
-        assertEquals(1, second.summarizeCallCount)
+        assertEquals(1, second.summarizeStoryCallCount)
     }
 
     @Test
@@ -248,7 +247,7 @@ class RoutingLlmProviderTest {
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
         second.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_RATE_LIMITED)
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_RATE_LIMITED, failure.failure.code)
     }
@@ -259,7 +258,7 @@ class RoutingLlmProviderTest {
         first.blockedBy = OPEN
         second.blockedBy = COOLDOWN
 
-        val failure = assertFailsWith<LlmProviderException> { router.summarizeNews(KEYWORD, ARTICLES) }
+        val failure = assertFailsWith<LlmProviderException> { router.summarizeStory(KEYWORDS, null, ARTICLES) }
 
         assertEquals(
             "no llm candidate available: ${first.name}=$OPEN, ${second.name}=$COOLDOWN",
@@ -270,8 +269,8 @@ class RoutingLlmProviderTest {
     @Test
     @DisplayName("요약 plan은 첫 후보의 것이고 그 후보를 먼저 호출한다")
     fun planComesFromFirstCandidate() = runBlocking {
-        val prepared = router.prepareNewsSummary()
-        prepared.summarize(KEYWORD, ARTICLES)
+        val prepared = router.prepareStorySummary()
+        prepared.summarize(KEYWORDS, null, ARTICLES)
 
         assertEquals(first.model.provider, prepared.plan.provider)
         assertEquals(first.name, callLog.first())
@@ -282,8 +281,8 @@ class RoutingLlmProviderTest {
     fun planIgnoresAvailability() = runBlocking {
         first.blockedBy = OPEN
 
-        val prepared = router.prepareNewsSummary()
-        val result = prepared.summarize(KEYWORD, ARTICLES)
+        val prepared = router.prepareStorySummary()
+        val result = prepared.summarize(KEYWORDS, null, ARTICLES)
 
         assertEquals(first.model.provider, prepared.plan.provider)
         assertEquals(second.name, result.metadata.model)
@@ -292,10 +291,10 @@ class RoutingLlmProviderTest {
     @Test
     @DisplayName("plan의 후보가 실패하면 다음 후보가 요약한다")
     fun summarizeWithNextCandidateWhenPlanCandidateFails() = runBlocking {
-        val prepared = router.prepareNewsSummary()
+        val prepared = router.prepareStorySummary()
         first.failures += AiTestFixture.llmProviderException(LlmFailureCode.LLM_TIMEOUT)
 
-        val result = prepared.summarize(KEYWORD, ARTICLES)
+        val result = prepared.summarize(KEYWORDS, null, ARTICLES)
 
         assertEquals(second.name, result.metadata.model)
         assertEquals(first.model.provider, prepared.plan.provider)
@@ -306,8 +305,8 @@ class RoutingLlmProviderTest {
     fun prepareReturnsPlanWhenAllCandidatesAreBlocked() = runBlocking {
         listOf(first, second).forEach { it.blockedBy = OPEN }
 
-        val prepared = router.prepareNewsSummary()
-        val failure = assertFailsWith<LlmProviderException> { prepared.summarize(KEYWORD, ARTICLES) }
+        val prepared = router.prepareStorySummary()
+        val failure = assertFailsWith<LlmProviderException> { prepared.summarize(KEYWORDS, null, ARTICLES) }
 
         assertEquals(LlmFailureCode.LLM_NOT_PERMITTED, failure.failure.code)
         assertNull(failure.failure.provider)
@@ -317,13 +316,13 @@ class RoutingLlmProviderTest {
     @DisplayName("차단이 풀린 후보는 다시 후보가 된다")
     fun retryCandidateOnceUnblocked() = runBlocking {
         first.blockedBy = OPEN
-        router.summarizeNews(KEYWORD, ARTICLES)
-        assertEquals(0, first.summarizeCallCount)
+        router.summarizeStory(KEYWORDS, null, ARTICLES)
+        assertEquals(0, first.summarizeStoryCallCount)
 
         first.blockedBy = null
-        router.summarizeNews(KEYWORD, ARTICLES)
+        router.summarizeStory(KEYWORDS, null, ARTICLES)
 
-        assertEquals(1, first.summarizeCallCount)
+        assertEquals(1, first.summarizeStoryCallCount)
     }
 
     @Test
@@ -343,13 +342,11 @@ class RoutingLlmProviderTest {
 
     private fun router(
         summary: List<FakeLlmProviderCandidate>,
-        expansion: List<FakeLlmProviderCandidate>,
-        story: List<FakeLlmProviderCandidate> = summary
+        expansion: List<FakeLlmProviderCandidate>
     ): RoutingLlmProvider {
         return RoutingLlmProvider(
             candidates = mapOf(
-                LlmUse.NEWS_SUMMARY to summary,
-                LlmUse.STORY_SUMMARY to story,
+                LlmUse.STORY_SUMMARY to summary,
                 LlmUse.KEYWORD_EXPANSION to expansion
             ),
             clock = clock
@@ -360,6 +357,7 @@ class RoutingLlmProviderTest {
         const val OPEN = "open"
         const val COOLDOWN = "cooldown"
         val KEYWORD: AiKeyword = AiTestFixture.keyword()
-        val ARTICLES = listOf(AiTestFixture.newsArticle())
+        val KEYWORDS: List<AiKeyword> = listOf(KEYWORD)
+        val ARTICLES = listOf(AiTestFixture.storySummaryArticle())
     }
 }

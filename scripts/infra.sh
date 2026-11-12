@@ -15,12 +15,43 @@ COMPOSE=(docker compose
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/infra.sh <target> <start|stop|restart|status|logs>
+Usage: ./scripts/infra.sh <target> <start|stop|restart|status|logs|reset>
 
 Targets:
   mysql, redis, mongo, kafka, tei, qdrant, observability
   user, collector, ai, notification, story, core, all
+
+  reset은 컨테이너와 데이터 volume을 지운다. tei는 모델 가중치라 reset 대상에서 뺀다.
 EOF
+}
+
+# 서비스별 데이터 volume. compose 프로젝트 이름(kachi)이 접두어로 붙는다.
+volume_of() {
+  case "$1" in
+    mysql|redis|mongo|kafka|qdrant|prometheus|grafana) echo "kachi_$1-data" ;;
+    *) return 1 ;;
+  esac
+}
+
+# 컨테이너를 지우고 데이터 volume을 지운다. TEI 가중치(kachi_tei-data)는 다시 받는 데 수 분이 걸려 건드리지 않는다.
+reset_services() {
+  local service volume
+  local -a targets=()
+  for service in "$@"; do
+    case "$service" in
+      tei-embedding|tei-reranker) echo "skip $service: 모델 가중치 volume은 지우지 않는다" ;;
+      *) targets+=("$service") ;;
+    esac
+  done
+  [[ ${#targets[@]} -gt 0 ]] || return 0
+  "${COMPOSE[@]}" rm -s -f "${targets[@]}" || return 1
+  for service in "${targets[@]}"; do
+    volume="$(volume_of "$service")" || continue
+    if docker volume inspect "$volume" >/dev/null 2>&1; then
+      docker volume rm "$volume" >/dev/null || return 1
+      echo "volume removed: $volume"
+    fi
+  done
 }
 
 services() {
@@ -70,5 +101,6 @@ case "$ACTION" in
   restart) "${COMPOSE[@]}" restart "${SELECTED[@]}" ;;
   status) "${COMPOSE[@]}" ps "${SELECTED[@]}" ;;
   logs) "${COMPOSE[@]}" logs -f "${SELECTED[@]}" ;;
+  reset) reset_services "${SELECTED[@]}" ;;
   *) usage; exit 1 ;;
 esac

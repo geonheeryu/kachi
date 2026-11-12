@@ -50,13 +50,19 @@ class KachiServiceContainer(
     /** 같은 network의 다른 서비스가 붙는 주소. */
     val urlInNetwork: String = "http://$module:$port"
 
+    /** 컨테이너 로그의 마지막 [lines]줄. 컨테이너가 만들어지지 않았으면 빈 문자열이다. */
+    fun logTail(lines: Int): String {
+        if (containerId == null) return ""
+        return logs.lines().takeLast(lines).joinToString("\n")
+    }
+
     private companion object {
         // 로컬 개발 JDK(`.sdkmanrc`의 Corretto 21)와 같은 배포판. Corretto는 JRE 이미지를 내지 않아 headless JDK가 가장 작다.
         const val BASE_IMAGE = "amazoncorretto:21-al2023-headless"
         const val JAR_PATH = "/app/app.jar"
-        // 처음 뜨는 JVM 다섯 개가 CPU를 나눠 쓴다. JIT 단계를 낮추고 힙을 제한해 기동을 앞당긴다.
+        // 함께 뜨는 JVM 여섯 개가 CPU를 나눠 쓴다. JIT 단계를 낮추고 힙을 제한해 기동을 앞당긴다.
         val JVM_OPTIONS = arrayOf("-Xmx512m", "-XX:TieredStopAtLevel=1", "-Dspring.jmx.enabled=false")
-        val STARTUP_TIMEOUT: Duration = Duration.ofMinutes(3)
+        val STARTUP_TIMEOUT: Duration = Duration.ofMinutes(4)
 
         fun jarPathOf(module: String): Path {
             val property = "kachi.e2e.jar.$module"

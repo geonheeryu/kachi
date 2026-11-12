@@ -1,11 +1,11 @@
 # 022. ai-service outbox와 이벤트 발행 보장
 
-이 outbox가 실제 broker까지 발행하는 계약은 ai-service의 `AiSummaryCycleIntegrationTest`가 검증한다(ADR 029).
+이 outbox가 실제 broker까지 발행하는 계약은 ai-service의 `AiStorySummaryCycleIntegrationTest`가 검증한다(ADR 029).
 이 설계는 collector `CollectorOutbox`(ADR 032)와 story-service `StoryOutbox`(ADR 033)에서도 같은 형태로 쓴다.
 
 ## 배경
 
-ai-service는 뉴스 요약을 만들고, 반복해서 실패하는 키워드를 격리한다. 
+ai-service는 story 요약 버전을 만들고, 반복해서 실패하는 story를 격리한다. 
 이 두 결과를 notification(ADR 013)으로 보내려면 MongoDB 저장과 Kafka 발행 사이의 유실 윈도우를 닫아야 한다. 
 요약은 저장됐는데 발행 직전에 프로세스가 죽으면 그 요약의 알림은 영원히 나가지 않고, 
 반대로 발행은 됐는데 저장이 실패하면 없는 요약의 알림이 나간다.
@@ -23,27 +23,27 @@ ai-service는 뉴스 요약을 만들고, 반복해서 실패하는 키워드를
 
 | 이벤트 | 시점 | eventKey | partitionKey |
 | --- | --- | --- | --- |
-| `SUMMARY_CREATED` | `news_summaries` insert 성공 | `newsSummaryId` | keyword |
-| `KEYWORD_QUARANTINED` | `TRACKING -> QUARANTINED` 전이 | `quarantineId:quarantinedAtEpochMillis` | keyword |
+| `SUMMARY_CREATED` | `DEVELOPMENT` 요약 버전 저장 | `storyId:version` | storyId |
+| `STORY_SPLIT_REQUESTED` | `NEW_STORY` 요약 버전 저장 | `split:storyId:version` | storyId |
+| `STORY_QUARANTINED` | `TRACKING -> QUARANTINED` 전이 | `quarantineId:quarantinedAtEpochMillis` | storyId |
 
-재사용된 요약과 이미 격리된 키워드의 추가 실패는 이벤트를 만들지 않는다. outbox 1행은 도메인 이벤트 1건이다.
+`NO_CHANGE` 버전과 이미 격리된 story의 추가 실패는 이벤트를 만들지 않는다(ADR 034). outbox 1행은 도메인 이벤트 1건이다.
 알림 채널 fan-out은 이 서비스의 관심사가 아니다(ADR 023).
 
-eventKey는 내용 해시가 아니라 aggregate 식별자다. ADR 011 이후 요약 1건은 `keyword + newsHash + promptVersion` 1건이므로 id가 곧 핵심 키다. 
-내용 해시를 쓰면 요약을 지우고 재생성할 때 outbox 키가 충돌해 요약 저장 자체가 실패하고, 그 실패는 키워드 탓이 아니라서 격리되지 않은 채 watermark를 영구히 붙잡는다.
+eventKey는 내용 해시가 아니라 aggregate 식별자다. 요약 버전 1건은 `(storyId, version)` 1건이므로 그 조합이 곧 핵심 키다(ADR 034).
+내용 해시는 LLM 응답에 따라 값이 달라져 같은 버전을 가리키는 키가 되지 못한다. 소비자의 멱등 키(ADR 035)도 이 조합이다.
 
 ### payload
 
 payload는 생성 시점의 JSON으로 고정한다. 요약 본문을 그대로 넣어 발행 시점에 원본을 다시 읽지 않는다.
 직렬화는 트랜잭션 전에 한다. 직렬화가 실패하면 요약 저장까지 막는다. 
-즉, 요약은 저장됐는데 알림은 영원히 없는 상태보다 요약 실패로 다음 tick에 재시도되는 쪽이 낫다.
+즉, 요약은 저장됐는데 알림은 영원히 없는 상태보다 요약 실패로 다음 시도에 재시도되는 쪽이 낫다.
 
 payload의 형태는 application 모델(`AiOutboxEvent`)이 아니라 별도 계약 타입이 정한다. 
-`me.rgunny.kachi.ai.contract` 패키지의 `AiSummaryCreatedEvent`·`AiKeywordQuarantinedEvent`가 그것이고, `schemaVersion`은 이 계약 타입의 필드다.
+`ai-contract` 모듈의 `AiSummaryCreatedEvent`·`AiStorySplitRequestedEvent`·`AiStoryQuarantinedEvent`가 그것이고, `schemaVersion`은 이 계약 타입의 필드다.
 application 모델과 계약을 나눈 이유는 도메인 enum이나 필드가 바뀔 때 발행 형식이 조용히 따라 바뀌지 않게 하기 위해서다. 
 어댑터가 두 모델을 값마다 짝지어 옮기므로 도메인이 바뀌면 컴파일이 멈춘다. 
 notification이 `NotificationDispatchMessage`와 `notification-contract`의 `NotificationDispatchEvent`를 나눈 것과 같은 구조다.
-소비자가 다른 모듈에 생기면 이 패키지를 `ai-contract` 모듈로 올린다.
 
 payload에는 `type`·`eventKey`·`partitionKey`가 없다. 이 값들은 outbox 행의 필드이고 발행자가 행에서 읽는다.
 어느 계약 타입으로 읽을지도 outbox 행의 `eventType`으로 고르므로 payload 안에 타입 표시가 필요 없다.
@@ -67,21 +67,20 @@ DEAD ──운영자 복구──> PENDING
 
 | 지점 | 경계 |
 | --- | --- |
-| 요약 insert + outbox insert | Mongo transaction. DuplicateKey는 transaction abort 후 기존 요약 재조회. outbox는 원래 insert한 쪽만 만든다 |
+| 요약 버전 insert + 기사 표시 + story CAS + outbox insert | Mongo transaction. 하나라도 어긋나면 abort하고 이번 결과를 버린다(ADR 034). outbox는 저장에 이긴 쪽만 만든다 |
 | 격리 전이 + outbox insert | Mongo transaction |
 | claim | `findAndModify(_id + PENDING + nextRetryAt <= now)` |
 | 발행 결과 반영 | `findAndModify(_id + PUBLISHING + claimedBy + claimedAt)`. 불일치는 소유권 상실이므로 무시하고 로그만 남긴다 |
 
 notification은 발행 결과 반영이 outbox + notification 두 문서라 transaction이 필요했다. 
 ai-service는 outbox 한 문서라 CAS 한 번으로 원자적이다. 
-`AiRun`, watermark는 outbox와 함께 확정될 이유가 없어 경계 밖이다.
+`AiRun`은 outbox와 함께 확정될 이유가 없어 경계 밖이다.
 
 발행 결과 반영 CAS의 `claimedAt`은 claim이 돌려준 값을 그대로 써야 한다. 
 MongoDB는 시각을 밀리초로 잘라 저장하고 CAS는 동등 비교이므로, relay가 자기 시계로 값을 다시 만들면 조건이 영원히 맞지 않는다.
 
-격리 전이 저장은 키워드 실패를 처리하는 자리에서 일어난다. 
-이 저장이 실패하면 그 키워드만 실패로 접히지 않고 실행 전체가 중단되며 `AiRun`은 RUNNING으로 남는다. 
-격리 기록과 알림이 함께 빠진 채 실행이 성공으로 끝나는 것보다는 낫다고 보지만, RUNNING으로 남는 실행 기록은 그 자체로 정리 대상이다(후속).
+격리 전이 저장은 story 요약 실패를 처리하는 자리에서 일어난다.
+이 저장이 실패하면 예외가 올라가 소비 경로는 같은 offset을 다시 처리하고 tick 경로는 그 story를 다음 tick으로 미룬다. 격리 기록과 알림이 함께 빠진 채 지나가지 않는다.
 
 이 결정으로 ai-service도 MongoDB replica set이 전제가 된다. Testcontainers는 `MongoDBContainer.withReplicaSet()`을 쓴다.
 
@@ -98,7 +97,7 @@ MongoDB는 시각을 밀리초로 잘라 저장하고 CAS는 동등 비교이므
 | 서킷 브레이커 | 두지 않음. broker 장기 장애는 DEAD 운영 큐로 (ADR 015와 같은 입장) |
 | DEAD 조회·복구 | 운영 internal API. `GET /internal/ai/outboxes`(상태 필터, 기본 DEAD)와 `POST /internal/ai/outboxes/{outboxId}/recover`. 복구는 DEAD 행에만 쓰는 조건부 갱신이라 동시 복구는 하나만 성공한다 |
 | 관측 | 로그(상태 전이 전부). metric은 후속 |
-| 멱등 | 같은 outbox 재발행은 같은 eventKey·같은 payload다. 발행 쪽은 중복을 막지 않고 소비자가 `summaryId` 기준으로 거른다(ADR 025 RoutingJob) — ADR 023 운영 규칙 |
+| 멱등 | 같은 outbox 재발행은 같은 eventKey·같은 payload다. 발행 쪽은 중복을 막지 않고 소비자가 `storyId:version` 기준으로 거른다(ADR 035 RoutingJob) |
 
 분류되지 않은 예외를 retryable로 보는 이유는, 모르는 실패를 DEAD로 보내면 운영자가 매번 복구해야 하기 때문이다.
 non-retryable은 발행자가 그렇게 선언한 것만이다.
@@ -111,7 +110,7 @@ jitter는 인스턴스가 하나여도 필요하다.
 
 polling relay scheduler가 기본이자 복구 경로다. 
 같은 인스턴스의 tick 겹침은 실행 lock(`ExecutionLockPort`의 `INSTANCE` 범위, ADR 036), 다중 인스턴스는 claim CAS가 막는다. 즉, relay는 다중 인스턴스에 안전하다. 
-뉴스 요약·키워드 확장 tick은 `CLUSTER` 범위로 선언됐지만 현재 구현이 in-memory라 단일 인스턴스 전제이며(ADR 036), distributed lock 구현은 별도 단계에서 다룬다.
+story 요약·키워드 확장 tick은 `CLUSTER` 범위로 선언됐지만 현재 구현이 in-memory라 단일 인스턴스 전제이며(ADR 036), distributed lock 구현은 별도 단계에서 다룬다.
 
 `kachi.ai.outbox.relay.enabled`로 relay 전체를 끈다. 
 이 값은 scheduler만 막는 것이 아니라 relay 유스케이스·executor·scheduler 빈을 전부 만들지 않는다. 
@@ -144,4 +143,3 @@ polling relay scheduler가 기본이자 복구 경로다.
 - backlog size/age metric
 - ~~visibilityTimeout과 batchSize x publish timeout 관계 재검토~~ — ADR 023에서 정리했다. visibilityTimeout이 재는 것은 행 하나의 발행 시간이라 batch 크기는 들어오지 않고, `max.block.ms + delivery.timeout.ms`(15s) < 60s로 확정했다.
 - 스케줄러 tick 분산 lock
-- 격리 전이 저장 실패로 중단된 실행의 `AiRun`이 RUNNING으로 남는다. 실행 기록을 실패로 닫을지 정한다

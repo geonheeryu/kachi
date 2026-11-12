@@ -10,9 +10,9 @@ class StoryQuarantineNotReleasableException(
     storyId: StoryId,
     status: StoryQuarantineStatus
 ) : AiException(
-    errorCode = AiQuarantineErrorCode.QUARANTINE_NOT_RELEASABLE,
+    errorCode = AiStoryQuarantineErrorCode.STORY_QUARANTINE_NOT_RELEASABLE,
     message = messageOf(
-        AiQuarantineErrorCode.QUARANTINE_NOT_RELEASABLE,
+        AiStoryQuarantineErrorCode.STORY_QUARANTINE_NOT_RELEASABLE,
         "storyId=${storyId.value}, status=$status"
     )
 )

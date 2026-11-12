@@ -8,15 +8,14 @@ import me.rgunny.kachi.ai.adapter.outbound.llm.ProviderHoldRegistry
 import me.rgunny.kachi.ai.adapter.outbound.llm.RoutingLlmProvider
 import me.rgunny.kachi.ai.application.port.inbound.outbox.FindAiOutboxesUseCase
 import me.rgunny.kachi.ai.application.port.inbound.outbox.RecoverAiOutboxUseCase
-import me.rgunny.kachi.ai.application.port.inbound.quarantine.FindKeywordQuarantinesUseCase
-import me.rgunny.kachi.ai.application.port.inbound.quarantine.ReleaseKeywordQuarantineUseCase
-import me.rgunny.kachi.ai.application.port.inbound.watermark.FindSummaryWatermarksUseCase
+import me.rgunny.kachi.ai.application.port.inbound.quarantine.FindStoryQuarantinesUseCase
+import me.rgunny.kachi.ai.application.port.inbound.quarantine.ReleaseStoryQuarantineUseCase
+import me.rgunny.kachi.ai.application.port.inbound.story.FindStorySummariesUseCase
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderAdminPort
 import me.rgunny.kachi.ai.application.port.outbound.llm.LlmProviderPort
 import me.rgunny.kachi.ai.application.port.outbound.outbox.AiOutboxEventSerializer
 import me.rgunny.kachi.ai.application.port.outbound.outbox.AiOutboxPublisherPort
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.AiOutboxEvent
-import me.rgunny.kachi.ai.application.port.outbound.outbox.model.SummaryCreatedEvent
+import me.rgunny.kachi.ai.application.port.outbound.outbox.model.StorySummaryCreatedEvent
 import me.rgunny.kachi.ai.application.service.outbox.AiOutboxRelayPolicy
 import me.rgunny.kachi.ai.application.service.outbox.RelayAiOutboxService
 import me.rgunny.kachi.ai.config.AiEventsProperties
@@ -93,12 +92,12 @@ class AiServiceApplicationTest {
     @Test
     @DisplayName("컨텍스트의 serializer가 발행 계약대로 payload를 만든다")
     fun serializeOutboxEventWithContextSerializer() {
-        val summary = AiTestFixture.newsSummary()
-        val event = SummaryCreatedEvent.from(summary)
+        val summary = AiTestFixture.storySummary()
+        val event = StorySummaryCreatedEvent.from(summary)
 
         val payload = jsonMapper.readValue(eventSerializer.serialize(event), Map::class.java)
 
-        assertEquals(AiOutboxEvent.CURRENT_SCHEMA_VERSION, payload["schemaVersion"])
+        assertEquals(StorySummaryCreatedEvent.SCHEMA_VERSION, payload["schemaVersion"])
         assertEquals(summary.id.value.toString(), payload["summaryId"])
         assertEquals("NEUTRAL", payload["sentiment"])
         assertEquals("2026-06-03T00:00:00Z", payload["createdAt"])
@@ -139,7 +138,8 @@ class AiServiceApplicationTest {
     @DisplayName("events 설정은 운영 yaml의 topic 이름으로 바인딩된다")
     fun bindProductionEventTopics() {
         assertEquals("ai.summary.created", eventsProperties.topics.summaryCreated)
-        assertEquals("ai.keyword.quarantined", eventsProperties.topics.keywordQuarantined)
+        assertEquals("ai.story.split-requested", eventsProperties.topics.storySplitRequested)
+        assertEquals("ai.story.quarantined", eventsProperties.topics.storyQuarantined)
     }
 
     /**
@@ -150,9 +150,9 @@ class AiServiceApplicationTest {
     @DisplayName("운영 API가 쓰는 유스케이스 빈이 모두 등록된다")
     fun registerInternalApiUseCases() {
         listOf(
-            FindKeywordQuarantinesUseCase::class.java,
-            ReleaseKeywordQuarantineUseCase::class.java,
-            FindSummaryWatermarksUseCase::class.java,
+            FindStoryQuarantinesUseCase::class.java,
+            ReleaseStoryQuarantineUseCase::class.java,
+            FindStorySummariesUseCase::class.java,
             FindAiOutboxesUseCase::class.java,
             RecoverAiOutboxUseCase::class.java
         ).forEach { type ->
