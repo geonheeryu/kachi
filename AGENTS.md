@@ -26,13 +26,15 @@
 - 사람이 해야 하는 일이 생기면 `docs/user-intervention.md`에 적고 다음 작업으로 넘어간다.
 - 작업 문서는 세 가지다. 진행 중인 내용은 `prompt.md`, 끝난 내용은 `HISTORY.md`, 단계별 스펙은 `tasks/<id>-<name>/`(규격은 `prompts/task-create.md`)에 적는다. 셋 다 커밋하지 않는다.
 - 기존 `DESIGN-*.md`는 그대로 두고 새 단계부터 `tasks/`를 쓴다.
-- 커밋과 push는 사용자가 그 커밋을 명시적으로 허락한 뒤에만 한다.
+- `main` 병합은 사용자만 한다. `main`에 직접 push하지 않는다.
+- 기능 브랜치의 커밋, push, draft PR 생성과 ready 전환, PR 코멘트, `pr-review` 워크플로 재실행은 `pr-review` 스킬의 흐름 안에서 승인 없이 한다. 그 밖의 커밋과 push는 사용자가 허락한 뒤에 한다.
 - 러너 세션은 커밋하지 않고 러너가 대신 커밋한다.
 
 ## 하네스
 
 - 이 저장소는 감독 모드(`harness.json`의 `mode: supervised`)라 러너를 쓰지 않는다.
-- `plan-and-build`는 tech-critic-lead 판정을 거쳐 `tasks/<id>-<name>/`을 만든 뒤 사용자 지시를 기다리고, 사용자가 phase를 지정하면 같은 세션에서 수행해 AC 결과를 보고한다.
+- `plan-and-build`는 tech-critic-lead 판정을 거쳐 `tasks/<id>-<name>/`을 만든 뒤 사용자 지시를 기다리고, 사용자가 phase를 지정하면 같은 세션에서 수행하고 `pr-review` 스킬을 거친 뒤 보고한다.
+- 리뷰, PR 생성, 검토 봇과의 왕복은 `pr-review` 스킬을 따른다. 등급과 소명 규칙은 `.agents/code-review-guideline.md`(kachi 규칙)와 `.agents/pr-review-common.md`(범용 결함)에 있다.
 - ADR 초안과 단계 스펙은 사용자에게 올리기 전에 `tech-critic-lead`(판단 기준은 `.agents/tech-critic-beliefs.md`)의 판정문을 붙인다. 판정은 참고 의견이고 결정은 사용자가 한다.
 
 ## 스킬

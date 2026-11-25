@@ -52,9 +52,78 @@ class PreToolUseBashTest(unittest.TestCase):
         self.assert_blocked("git commit -m 'x'", "러너", RUNNER_ENV)
         self.assert_blocked("cd sub && git -C .. push origin main", "push", RUNNER_ENV)
 
-    def test_commit_and_push_pass_to_permission_prompt_in_supervised_session(self):
+    def test_commit_and_feature_branch_push_are_allowed_in_supervised_session(self):
+        sh(["git", "checkout", "-q", "-b", "feat/x"], self.repo.root)
         self.assert_allowed("git commit -m 'x'")
-        self.assert_allowed("git push origin main")
+        self.assert_allowed("git push -u origin feat/x")
+        self.assert_allowed("git push")
+        for command in (
+            "git push -u origin feat/x && gh pr create --draft --base main --title 'fix: main 정리'",
+            "git push origin feat/main-cleanup; git fetch origin main",
+            "git push && gh api repos/o/r/issues/1/comments -f body=x",
+            "git push | tail -f",
+            "git commit -m 'push main -f'",
+            "git checkout main && git pull",
+            "git checkout -b feat/y main && git push -u origin feat/y",
+            "git switch -c feat/y main && git push -u origin feat/y",
+            "git commit -m 'fix -n option'",
+            "git push -n origin feat/x",
+        ):
+            with self.subTest(command=command):
+                self.assert_allowed(command)
+
+    def test_merge_is_blocked(self):
+        for command in (
+            "gh pr merge 23 --squash",
+            "gh -R o/r pr merge 23",
+            "gh api -X PUT repos/o/r/pulls/23/merge",
+            "gh api -X PUT repos/o/r/pulls/$PR/merge",
+            "gh api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'",
+            "gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {}) { clientMutationId } }'",
+            "gh api -X POST repos/o/r/merges -f base=main -f head=feat/x",
+        ):
+            with self.subTest(command=command):
+                self.assert_blocked(command, "병합")
+
+    def test_push_to_main_is_blocked(self):
+        sh(["git", "checkout", "-q", "-b", "feat/x"], self.repo.root)
+        for command in (
+            "git push origin main",
+            "git push origin main; echo done",
+            "git push origin 'HEAD:main'",
+            "git push origin HEAD:refs/heads/main",
+            "git -c push.default=current push origin main",
+            "git --no-pager push origin feat/x:main",
+            "git checkout main && git merge feat/x && git push",
+            "(cd sub && git push origin main)",
+            "git push origin main>/dev/null",
+            "gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=abc",
+        ):
+            with self.subTest(command=command):
+                self.assert_blocked(command, "main")
+
+    def test_forced_and_unverified_push_is_blocked(self):
+        sh(["git", "checkout", "-q", "-b", "feat/x"], self.repo.root)
+        for command, fragment in (
+            ("git push --force origin feat/x", "--force"),
+            ("git push origin feat/x --force-with-lease", "--force"),
+            ("git push -f", "강제"),
+            ("git push -uf origin feat/x", "강제"),
+            ("git push origin +feat/x", "강제"),
+            ("git push --all", "--all"),
+            ("git push --mirror", "--mirror"),
+            ("git push --no-verify origin feat/x", "--no-verify"),
+            ("git commit --no-verify -m x", "--no-verify"),
+            ("git commit -n -F m.txt", "commit -n"),
+            ("git commit -nm x", "commit -n"),
+            ("git commit -an -m x", "commit -n"),
+            ("git -c core.hooksPath=/dev/null push origin feat/x", "core.hooksPath"),
+        ):
+            with self.subTest(command=command):
+                self.assert_blocked(command, fragment)
+
+    def test_push_without_refspec_is_blocked_on_main(self):
+        self.assert_blocked("git push", "현재 브랜치가 main")
 
     def test_destructive_git_is_blocked(self):
         self.assert_blocked("git reset --hard HEAD~1", "reset --hard")

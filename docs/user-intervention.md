@@ -11,6 +11,7 @@
 | 3 | TEI·Qdrant 컨테이너 첫 기동 | 머신마다 한 번 |
 | 4 | LLM 실호출 검증 계정 | 과금 계정을 쓸 때 |
 | 5 | 전체 사이클 스모크의 수신 확인 | 사이클 구성이 바뀔 때 |
+| 6 | PR 검토 봇의 secret과 `main` 보호 | 저장소마다 한 번 |
 
 ## 1. `.env`·`.env.<profile>`의 실제 값
 
@@ -48,3 +49,13 @@ story-service의 `realTest`와 전체 사이클 스모크가 이 컨테이너를
 - [ ] `docs/전체-사이클-스모크.md`의 확인 절차대로 Slack, Discord, Telegram에 알림이 도착했는지 사람이 확인한다.
 
 에이전트는 발송 로그까지만 확인할 수 있고, 실제 채널에 도착했는지는 사람이 화면으로 확인한다.
+
+## 6. PR 검토 봇의 secret과 `main` 보호
+
+- [ ] 저장소 Settings > Rules > Rulesets에서 `main`에 규칙을 건다: PR 필수(필요 승인 수 0), force push 금지, 삭제 금지, 필수 status check `test`(`.github/workflows/ci.yml`의 job).
+- [ ] 저장소 Settings > Advanced Security에서 Secret Protection과 Push protection을 켠다.
+- [ ] `claude setup-token`으로 OAuth 토큰을 만들고 `gh secret set CLAUDE_CODE_OAUTH_TOKEN`으로 저장소 secret에 넣는다.
+- [ ] 이 워크플로가 병합된 뒤의 첫 PR에서 `review` job과 `post` job이 성공하고, `github-actions[bot]`이 요약 코멘트 1개와 P0·P1 인라인 코멘트를 남기는지 확인한다. 워크플로를 들이는 PR에서는 base 브랜치에 검토 지침과 스크립트가 없어 실패한다.
+- [ ] 같은 PR에 한 번 더 push해 요약이 새로 생기지 않고 갱신되는지, 회차가 2가 되는지, `review` job 로그에 hook 실행이 없는지 확인한다.
+
+저장소 설정과 토큰 발급에는 사람의 계정 권한이 필요하다. 이 설정들이 맡는 역할은 ADR 037에 있다.

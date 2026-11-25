@@ -6,11 +6,12 @@ stdin으로 Claude Code 훅 JSON(tool_name, tool_input, cwd)을 받는다.
 
 항상 차단:
   - DESTRUCTIVE_GIT의 명령                    미커밋 작업을 지우는 명령
+  - check_human_only의 명령                   PR 병합, 강제 push, main으로의 push, --no-verify. 병합은 사람만 한다
   - harness.json frozen_paths 안의 파일 편집   러너 세션이면 phase의 unfreeze는 허용
 러너 세션(HARNESS_HEADLESS=1)에서만 차단:
   - git commit, git push                     세션은 커밋하지 않고 러너가 커밋한다
   - phase scope 밖 파일 편집(저장소 밖 포함)
-감독 세션의 커밋·push 허락은 대화에서 받는다(AGENTS.md). 도구 프롬프트는 .claude/settings.json의 permissions.ask가 PR 생성(gh pr create)에만 낸다.
+감독 세션은 기능 브랜치의 커밋·push·PR 생성을 pr-review 스킬의 흐름 안에서 승인 없이 한다(AGENTS.md).
 Bash의 리다이렉트·sed -i 쓰기는 보지 않는다. 그 백스톱은 러너의 사후 검사다.
 """
 
@@ -19,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -41,6 +43,23 @@ DESTRUCTIVE_GIT = [
     (re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?checkout\s+(?:\S+\s+)*--\s"), "git checkout -- <path>: 미커밋 변경을 덮어씁니다"),
     (re.compile(r"\bgit\s+(?:-C\s+\S+\s+)?restore\b"), "git restore: 미커밋 변경을 덮어씁니다"),
 ]
+# git과 하위 명령 사이에는 전역 옵션만 허용한다. 커밋 메시지 안의 단어 push를 명령으로 읽지 않기 위해서다.
+GIT = r"\bgit(?:\s+(?:-[Cc]\s+\S+|--[\w-]+(?:=\S+)?))*\s+"
+GIT_PUSH = re.compile(GIT + r"push(?![\w-])")
+GIT_COMMIT = re.compile(GIT + r"commit(?![\w-])")
+# 새 브랜치를 main에서 따는 꼴(-b, -c)은 main으로 옮겨 가는 것이 아니다.
+GIT_TO_MAIN = re.compile(GIT + r"(?:checkout|switch)\s+(?!(?:\S+\s+)*?-[bBcC]\b)(?:\S+\s+)*?['\"]?main['\"]?\s*$")
+TOKEN_EDGE = "'\"(){}`"
+SEGMENT = re.compile(r"[;&|\n]+")
+MAIN_REFS = {"main", "refs/heads/main"}
+HUMAN_ONLY = [
+    (re.compile(r"\bgh\b[^;&|\n]*\bpr\s+merge\b"), "gh pr merge: 병합은 사용자만 합니다"),
+    (re.compile(r"\bpulls/[^/\s]+/merge\b"), "pulls/<번호>/merge API: 병합은 사용자만 합니다"),
+    (re.compile(r"\b(?:mergePullRequest|enablePullRequestAutoMerge)\b"), "병합 GraphQL mutation: 병합은 사용자만 합니다"),
+    (re.compile(r"\brepos/[^/\s]+/[^/\s]+/merges\b"), "merges API: 병합은 사용자만 합니다"),
+    (re.compile(r"\bgit/refs/heads/main\b"), "git/refs/heads/main API: main에는 직접 쓰지 않습니다"),
+    (re.compile(r"\bcore\.hooksPath\b"), "core.hooksPath: pre-commit과 pre-push 검사를 건너뜁니다"),
+]
 
 
 def project_root(payload: dict) -> Path:
@@ -54,12 +73,58 @@ def is_runner_session() -> bool:
     return os.environ.get("HARNESS_HEADLESS") == "1"
 
 
-def check_bash(command: str) -> str | None:
+def current_branch(cwd: Path) -> str:
+    result = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=str(cwd), capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def check_push(args: str) -> str | None:
+    """push 명령 하나의 인자를 본다. 뒤에 이어진 다른 명령의 인자는 넘어오지 않는다."""
+    for raw in args.split():
+        token = re.split(r"[<>]", raw, maxsplit=1)[0].strip(TOKEN_EDGE)
+        if token.startswith("--force") or token in ("--mirror", "--all"):
+            return f"git push {token}: 원격 이력이나 다른 브랜치를 덮어씁니다"
+        if token.startswith("+") or (re.fullmatch(r"-[a-zA-Z]+", token) and "f" in token):
+            return "강제 push: 원격 이력을 덮어씁니다"
+        if token in MAIN_REFS or token.rsplit(":", 1)[-1] in MAIN_REFS:
+            return "main으로의 push: main에는 직접 push하지 않습니다"
+    return None
+
+
+def check_human_only(command: str, cwd: Path) -> str | None:
+    for pattern, reason in HUMAN_ONLY:
+        if pattern.search(command):
+            return reason
+    segments = [s.strip() for s in SEGMENT.split(command)]
+    pushes = [m for m in (GIT_PUSH.search(s) for s in segments) if m]
+    for segment in segments:
+        commit = GIT_COMMIT.search(segment)
+        if "--no-verify" in segment and (GIT_PUSH.search(segment) or commit):
+            return "--no-verify: pre-commit과 pre-push 검사를 건너뜁니다"
+        # commit의 -n은 --no-verify의 단축 꼴이다. 메시지(-m 뒤)는 보지 않는다.
+        for token in segment[commit.end():].split() if commit else ():
+            short = re.fullmatch(r"-[a-zA-Z]+", token)
+            if short and "n" in token:
+                return "git commit -n: --no-verify와 같습니다. pre-commit 검사를 건너뜁니다"
+            if (short and re.search(r"[mF]", token)) or token.startswith(("--message", "--file")):
+                break
+    for match in pushes:
+        reason = check_push(match.string[match.end():])
+        if reason:
+            return reason
+    if pushes:
+        # refspec 없는 push는 현재 브랜치를 올린다. 같은 명령 안에서 main으로 옮겨 간 경우도 막는다.
+        if current_branch(cwd) == "main" or any(GIT_TO_MAIN.search(s) for s in segments):
+            return "현재 브랜치가 main입니다. main에는 직접 push하지 않습니다"
+    return None
+
+
+def check_bash(command: str, cwd: Path) -> str | None:
     rules = DESTRUCTIVE_GIT + (RUNNER_ONLY_GIT if is_runner_session() else [])
     for pattern, reason in rules:
         if pattern.search(command):
             return reason
-    return None
+    return check_human_only(command, cwd)
 
 
 def check_edit(root: Path, payload: dict) -> str | None:
@@ -91,7 +156,7 @@ def main() -> None:
     tool = payload.get("tool_name", "")
     try:
         if tool == "Bash":
-            reason = check_bash((payload.get("tool_input") or {}).get("command", ""))
+            reason = check_bash((payload.get("tool_input") or {}).get("command", ""), Path(payload.get("cwd") or Path.cwd()))
         elif tool in EDIT_TOOLS:
             reason = check_edit(project_root(payload), payload)
         else:

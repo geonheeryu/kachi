@@ -1,0 +1,97 @@
+# 같은 저장소 브랜치의 PR마다(draft 포함) Claude가 diff를 범용 기술 관점으로 검토한다. 봇은 파일만 읽고 JSON을 내고, 코멘트는 뒤 job의 스크립트가 쓴다.
+# 검토 규칙은 .agents/pr-review-common.md와 .agents/pr-review-exclusions.md, 이렇게 짠 이유는 docs/decisions/037-코드-리뷰-2단-구성.md에 있다.
+name: pr-review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+jobs:
+  # 신뢰할 수 없는 입력(PR 내용)을 읽는 job. 쓰기 권한과 셸이 없다.
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # 새 push가 오면 앞선 검토를 취소한다. post job은 취소하지 않는다. 인라인만 달리고 요약이 빠지면 다음 실행이 같은 번호로 다시 단다.
+    concurrency:
+      group: pr-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      skip: ${{ steps.collect.outputs.skip }}
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      # 병합 커밋이 아니라 PR head를 받는다. 봇이 적는 줄 번호와 인라인 코멘트의 commit_id가 같은 커밋을 가리켜야 한다.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      # 지침과 스크립트는 PR head가 아니라 base 커밋의 것을 쓴다. PR이 고쳐도 그 PR의 검토 기준은 바뀌지 않는다. post job도 같은 커밋을 쓴다.
+      - name: base 커밋의 검토 지침과 스크립트 꺼내기
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git show FETCH_HEAD:.agents/pr-review-common.md > "$RUNNER_TEMP/pr-review-system.md"
+          printf '\n\n' >> "$RUNNER_TEMP/pr-review-system.md"
+          git show FETCH_HEAD:.agents/pr-review-exclusions.md >> "$RUNNER_TEMP/pr-review-system.md"
+          git show FETCH_HEAD:scripts/harness/pr_review.py > "$RUNNER_TEMP/pr_review.py"
+      - name: 검토 입력 모으기
+        id: collect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 "$RUNNER_TEMP/pr_review.py" collect --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" --out .pr-review-input
+      # SHA를 올릴 때 다시 확인할 것: github_token을 주면 OIDC 교환을 건너뛰는지(src/github/token.ts), --setting-sources 처리, --json-schema와 structured_output 출력.
+      # 쓰지 않는 입력: track_progress, show_full_output, allowed_bots, allowed_non_write_users, 개인 access token.
+      - uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1
+        id: claude
+        if: steps.collect.outputs.skip != 'true'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          allow_fork_prs: "false"
+          prompt: |
+            너는 CI의 PR 검토 봇이다. 시스템 프롬프트에 붙은 PR 검토 지침대로 이 PR을 검토하라.
+            입력은 작업 디렉터리의 `.pr-review-input/`에 있다. 지침의 "입력 파일" 절 순서로 읽는다.
+            결과는 지침의 "결과" 절대로 JSON 하나로 낸다. 코멘트를 쓰는 도구는 없다.
+          claude_args: |
+            --model claude-fable-5-2
+            --permission-mode default
+            --setting-sources user
+            --max-turns 40
+            --allowedTools "Read,Grep,Glob,StructuredOutput"
+            --disallowedTools "Bash,Edit,Write,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+            --append-system-prompt-file ${{ runner.temp }}/pr-review-system.md
+            --json-schema '{"type":"object","properties":{"findings":{"type":"array","items":{"type":"object","properties":{"grade":{"type":"string","enum":["P0","P1","P2"]},"path":{"type":"string"},"line":{"type":"integer"},"text":{"type":"string"}},"required":["grade","path","line","text"]}},"previous":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"status":{"type":"string","enum":["해결됨","소명됨","남음"]},"note":{"type":"string"}},"required":["id","status"]}},"questions":{"type":"array","items":{"type":"string"}},"reviewed":{"type":"string"},"not_reviewed":{"type":"string"}},"required":["findings","previous","questions","reviewed","not_reviewed"]}'
+  # 봇의 결과를 검증해 코멘트를 쓰는 job. PR 내용을 모델에 넣지 않는다.
+  post:
+    needs: review
+    if: needs.review.outputs.skip != 'true' && needs.review.outputs.result != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: pr-review-post-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/harness
+      - name: 인라인 코멘트와 요약 쓰기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_REVIEW_RESULT: ${{ needs.review.outputs.result }}
+        run: python3 scripts/harness/pr_review.py post --repo "$REPO" --pr "$PR" --head "$HEAD_SHA"
