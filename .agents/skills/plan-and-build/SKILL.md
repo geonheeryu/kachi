@@ -14,7 +14,7 @@ $ARGUMENTS
 5. task 파일을 만든다. `prompts/task-create.md`의 형식대로 `tasks/{id}-{name}/`을 만든다. AC는 `harness.json`의 verify 명령과 실행 가능한 명령으로만 쓴다. 승인 조건은 해당 phase의 AC나 "하지 말아야 할 것"에 옮겨 적는다. `python3 scripts/harness/run_phases.py {id}-{name} --dry-run`으로 스펙을 검증한다.
 6. 실행한다.
    - `runner`: `python3 scripts/harness/run_phases.py {id}-{name}`. 실패하면 `tasks/{id}-{name}/state.json`의 `error_message`와 `phase{N}-output.json`으로 원인을 확인하고, phase 파일을 고친 뒤 `--resume`한다.
-   - `supervised`: task 디렉터리 경로와 phase 목록, critic 판정문을 사용자에게 제출하고 기다린다. 사용자가 phase를 지정하면 그 phase 파일을 읽고 같은 세션에서 수행한 뒤 AC를 실행해 결과를 보고한다. 커밋은 사용자 승인 뒤에만 한다.
+   - `supervised`: task 디렉터리 경로와 phase 목록, critic 판정문을 사용자에게 제출하고 기다린다. 사용자가 phase를 지정하면 그 phase 파일을 읽고 같은 세션에서 수행한 뒤 AC를 실행한다. 지정한 phase의 AC가 모두 통과하면 `pr-review` 스킬을 인자 없이 따르고(리뷰, 커밋, draft PR, 검토 봇과의 왕복), PR이 ready가 된 뒤 AC 결과와 스킬의 보고를 함께 올린다.
 
 ## 규칙
 

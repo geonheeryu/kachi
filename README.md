@@ -241,3 +241,4 @@ SPRING_PROFILES_ACTIVE=dev ./scripts/app.sh user-service start   # dev, .env.dev
 | [034. ai-service story 요약](./docs/decisions/034-ai-service-story-요약.md) | story·기사 사본으로 요약, 미요약 수 즉시 트리거와 대기 상한 tick, `(storyId, version)` 멱등과 story CAS, `developmentKind`별 발행, story 격리, `ai.summary.created` schemaVersion 2 |
 | [035. notification-routing의 story 요약 소비와 storyId 멱등](./docs/decisions/035-notification-routing-story-요약-소비와-storyId-멱등.md) | schemaVersion 2만 소비, `{storyId}:{version}` 멱등, 구독 수신자 페이지 조회와 진행 커서의 조건부 저장, 수신자별 본문, story 격리 알림, 발행 스위치, 키워드 요약 경로 폐지 |
 | [036. 실행 lock 포트 분리와 lock 범위](./docs/decisions/036-실행-lock-포트-분리와-lock-범위.md) | 중복 실행 방지를 `ExecutionLockPort`로 분리, 실행 단위마다 `INSTANCE`·`CLUSTER` 범위 선언, outbox relay가 `INSTANCE`인 이유 |
+| [037. 코드 리뷰 2단 구성](./docs/decisions/037-코드-리뷰-2단-구성.md) | PR 전 지침 리뷰어와 결함 리뷰어, PR 뒤 CI 검토 봇, 등급과 소명, 2회차 왕복 상한, 승인 없는 기능 브랜치 push와 사람만 하는 병합, 워크플로 보안 기준 |

@@ -13,6 +13,6 @@
     "diff_paths": ["docs/", "README.md", "*/README.md"],
     "allowlist": "scripts/doc-paths.json"
   },
-  "frozen_paths": [],
+  "frozen_paths": ["scripts/harness/hooks/", "scripts/harness/githooks/", ".claude/settings.json", ".claude/settings.local.json", ".github/workflows/pr-review.yml"],
   "commit": { "mode": "none", "language": "ko" }
 }
